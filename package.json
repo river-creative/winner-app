@@ -36,6 +36,7 @@
     "@types/express": "^5.0.3",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.19.11",
+    "@types/node-cron": "^3.0.11",
     "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.10",
     "puppeteer": "^24.17.0",
@@ -53,6 +54,7 @@
     "helmet": "^8.1.0",
     "mp-js-api": "^0.0.30",
     "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "uuid": "^9.0.1"
   }
 }

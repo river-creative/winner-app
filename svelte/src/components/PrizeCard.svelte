@@ -3,18 +3,27 @@
 
 	interface Props {
 		prize: Prize;
+		isSelected?: boolean;
+		showSelectButton?: boolean;
+		onSelect?: (prize: Prize) => void;
 		onEdit?: (prize: Prize) => void;
 		onDelete?: (prize: Prize) => void;
 	}
 
-	let { prize, onEdit, onDelete }: Props = $props();
+	let { prize, isSelected = false, showSelectButton = false, onSelect, onEdit, onDelete }: Props =
+		$props();
 
 	const hasTemplate = $derived(!!prize.templateId);
 	const isLowQuantity = $derived(prize.quantity <= 3 && prize.quantity > 0);
 	const isOutOfStock = $derived(prize.quantity === 0);
 </script>
 
-<div class="card prize-card h-100" class:border-warning={isLowQuantity} class:border-danger={isOutOfStock}>
+<div
+	class="card prize-card h-100"
+	class:border-warning={isLowQuantity && !isSelected}
+	class:border-danger={isOutOfStock && !isSelected}
+	class:border-selected={isSelected}
+>
 	<div class="card-body d-flex flex-column">
 		<div class="d-flex justify-content-between align-items-start mb-2">
 			<h6 class="card-title mb-0 text-truncate" title={prize.name}>
@@ -52,6 +61,22 @@
 		{/if}
 
 		<div class="mt-auto pt-2">
+			{#if showSelectButton}
+				<button
+					type="button"
+					class="btn w-100 mb-2"
+					class:btn-success={isSelected}
+					class:btn-outline-primary={!isSelected}
+					onclick={() => onSelect?.(prize)}
+					disabled={isOutOfStock}
+				>
+					{#if isSelected}
+						<i class="bi bi-check-circle-fill me-1"></i>Selected
+					{:else}
+						<i class="bi bi-circle me-1"></i>Select
+					{/if}
+				</button>
+			{/if}
 			<div class="btn-group btn-group-sm w-100" role="group">
 				{#if onEdit}
 					<button
@@ -96,5 +121,10 @@
 
 	.quantity-badge {
 		text-align: center;
+	}
+
+	.border-selected {
+		border: 2px solid var(--bs-success) !important;
+		box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
 	}
 </style>

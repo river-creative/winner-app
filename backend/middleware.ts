@@ -10,6 +10,7 @@ const allowedOrigins = [
   'https://revival.com',
   /\.revival\.com$/,  // all revival.com subdomains
   'http://localhost:5173',
+  'http://localhost:6001',  // Svelte dev server
   'http://localhost:3000',
   'http://localhost:3001'
 ];

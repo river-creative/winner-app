@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { winnersFilterStore } from '$stores/filters.svelte';
+	import { dataStore } from '$stores/data.svelte';
 
 	interface Props {
 		showBatch?: boolean;
@@ -94,7 +95,7 @@
 	{#if hasActiveFilters}
 		<div class="mt-2">
 			<small class="text-muted">
-				Showing {winnersFilterStore.filtered.length} of {winnersFilterStore.filtered.length} winners
+				Showing {winnersFilterStore.filtered.length} of {dataStore.winners.length} winners
 			</small>
 		</div>
 	{/if}

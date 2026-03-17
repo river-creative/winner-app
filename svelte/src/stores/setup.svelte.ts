@@ -173,6 +173,16 @@ class SetupStore {
 	}
 
 	/**
+	 * Computed: Selected prize's default winners count
+	 */
+	get selectedPrizeDefaultWinners(): number | null {
+		const prizeId = this._selectedPrizeId.current;
+		if (!prizeId) return null;
+		const prize = dataStore.prizes.find((p) => p.prizeId === prizeId);
+		return prize?.winnersCount ?? null;
+	}
+
+	/**
 	 * Computed: Winners count exceeds eligible entries
 	 */
 	get entriesExceeded(): boolean {

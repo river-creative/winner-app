@@ -45,11 +45,11 @@ class TextingService {
       } catch (e) {
         console.warn('Could not parse SMS response:', e);
       }
-      
+
       if (winnerId) {
-        // Extract messageId from the response
+        // Extract messageId from response
         const messageId = result?.data?.id || null;
-        
+
         // Update winner record with minimal SMS data (optimized structure)
         const smsUpdateData = {
           status: 'queued',
@@ -192,35 +192,21 @@ class TextingService {
         });
       }
 
-      // Fire request without awaiting (fire-and-forget)
-      const body = {
-        action: 'sendMessage',
+      // Fire-and-forget using backend queueAndSend for server-side tracking
+      this.makeRequestFireAndForget({
+        action: 'queueAndSend',
         data: {
-          message: personalizedMessage,
-          phoneNumbers: [recipient.phone],
-          options: options
+          winnerId: recipient.winnerId,
+          phoneNumber: recipient.phone,
+          message: personalizedMessage
         }
-      };
+      });
 
-      // Mark as sending
-      if (recipient.winnerId) {
-        // Fire and forget - don't await
-        this.updateWinnerSMSStatus(recipient.winnerId, {
-          status: 'sending',
-          sentAt: Date.now(),
-          message: personalizedMessage,
-          phoneNumber: recipient.phone
-        });
-      }
-
-      // Fire and forget - don't await
-      this.makeRequestFireAndForget(body, recipient.winnerId);
-      
       sent++;
       results.sent = sent;
       results.pending = recipients.length - sent;
-      
-      // Small delay between requests to avoid overwhelming (10 requests per second max)
+
+      // Small delay between requests (20ms = 50 requests per second max)
       await this.delay(20);
     }
 
@@ -569,44 +555,73 @@ class TextingService {
   }
 
   /**
-   * Batch check message statuses for multiple winners
+   * Process pending SMS jobs via backend scheduler
    */
   async checkAllPendingStatuses() {
     try {
-      // Get all winners
-      const winners = await Database.getFromStore('winners');
-      
-      console.log('Checking SMS statuses. Total winners:', winners.length);
-      console.log('Winners with SMS:', winners.filter(w => w.sms).map(w => ({
-        name: w.displayName,
-        status: w.sms?.status,
-        messageId: w.sms?.messageId
-      })));
-      
-      // Filter winners with pending SMS
-      const pendingWinners = winners.filter(w => 
-        w.sms?.messageId && 
-        (!w.sms.status || w.sms.status === 'queued' || w.sms.status === 'pending' || w.sms.status === 'sending')
-      );
-      
-      console.log('Pending winners found:', pendingWinners.length);
-      
-      // Check status for each pending winner
-      for (const winner of pendingWinners) {
-        await this.checkMessageStatus(winner.winnerId, winner.sms.messageId);
-        // Small delay between checks
-        await this.delay(100);
-      }
-      
-      return pendingWinners.length;
-    } catch (error) {
-      console.error('Error checking pending statuses:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
+      const result = await this.makeRequest({
+        action: 'processQueue',
+        data: {}
       });
-      throw error; // Re-throw to see in the UI
+      console.log(`Backend processed ${result.processed} pending jobs`);
+      return result.processed;
+    } catch (error) {
+      console.error('Error processing queue:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get job statistics from backend
+   */
+  async getJobStats() {
+    try {
+      return await this.makeRequest({
+        action: 'getJobStats',
+        data: {}
+      });
+    } catch (error) {
+      console.error('Error getting job stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark stuck messages (queued with no messageId) as 'sent' since we can't verify them
+   */
+  async markUntrackableAsSent() {
+    try {
+      const winners = await Database.getFromStore('winners');
+
+      // Find winners with queued status but no messageId
+      const stuckWinners = winners.filter(w =>
+        w.sms &&
+        !w.sms.messageId &&
+        (w.sms.status === 'queued' || w.sms.status === 'sending' || w.sms.status === 'pending')
+      );
+
+      console.log(`Found ${stuckWinners.length} stuck messages without messageId`);
+
+      if (stuckWinners.length === 0) {
+        return 0;
+      }
+
+      // Update each stuck winner
+      const operations = [];
+      for (const winner of stuckWinners) {
+        winner.sms.status = 'sent';
+        winner.sms.unverified = true;
+        winner.sms.note = 'Marked as sent - no messageId available for delivery tracking';
+        operations.push({ collection: 'winners', data: winner });
+      }
+
+      await Database.batchSave(operations);
+      console.log(`Marked ${stuckWinners.length} messages as 'sent' (unverified)`);
+
+      return stuckWinners.length;
+    } catch (error) {
+      console.error('Error marking untrackable messages:', error);
+      throw error;
     }
   }
 
@@ -677,8 +692,10 @@ export const Texting = {
   sendWinnerSMS: (winner) => textingInstance.sendWinnerSMS(winner),
   sendBulkWinnerSMS: (winners) => textingInstance.sendBulkWinnerSMS(winners),
   sendCurrentWinnersSMS: () => textingInstance.sendCurrentWinnersSMS(),
-  sendToCurrentWinners: () => textingInstance.sendToCurrentWinners(),  // Add the correct method
-  checkAllPendingStatuses: () => textingInstance.checkAllPendingStatuses(),  // Add missing export
+  sendToCurrentWinners: () => textingInstance.sendToCurrentWinners(),
+  checkAllPendingStatuses: () => textingInstance.checkAllPendingStatuses(),
+  markUntrackableAsSent: () => textingInstance.markUntrackableAsSent(),
+  getJobStats: () => textingInstance.getJobStats(),
   abortSending: () => textingInstance.abortSending(),
   getSMSStats: (messageId) => textingInstance.getSMSStats(messageId),
   showSMSDialog: () => textingInstance.showSMSDialog(),

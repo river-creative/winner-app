@@ -24,8 +24,8 @@ function sessionAuthPlugin() {
           return next();
         }
 
-        // Skip auth for login page and static assets
-        if (req.url?.startsWith('/login') || req.url?.startsWith('/api/')) {
+        // Skip auth for public pages and API
+        if (req.url?.startsWith('/login') || req.url?.startsWith('/api/') || req.url?.startsWith('/conditions')) {
           return next();
         }
 

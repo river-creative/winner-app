@@ -116,33 +116,72 @@ class WinnersFilterStore {
 	}
 
 	/**
-	 * Computed: Unique prize names from all winners
+	 * Get items filtered by all filters EXCEPT the specified one.
+	 * This enables cascading dropdowns where each dropdown shows only
+	 * values that exist within the constraints of other active filters.
+	 */
+	getItemsExcludingFilter(excludeFilter: 'prize' | 'list' | 'batch' | 'date'): Winner[] {
+		return dataStore.winners.filter((w) => {
+			if (excludeFilter !== 'prize' && this.filterPrize && w.prize !== this.filterPrize)
+				return false;
+			if (excludeFilter !== 'list' && this.filterList && w.listName !== this.filterList)
+				return false;
+			if (excludeFilter !== 'batch' && this.filterBatch && w.historyId !== this.filterBatch)
+				return false;
+			if (excludeFilter !== 'date' && this.filterDate) {
+				const winnerDate = new Date(w.timestamp).toISOString().split('T')[0];
+				if (winnerDate !== this.filterDate) return false;
+			}
+			return true;
+		});
+	}
+
+	/**
+	 * Computed: Unique prize names (cascading - respects other active filters)
 	 */
 	get uniquePrizes(): string[] {
-		return [...new Set(dataStore.winners.map((w) => w.prize))].sort();
+		const items = this.getItemsExcludingFilter('prize');
+		const prizes = [...new Set(items.map((w) => w.prize))].sort();
+		// Always include currently selected value even if filtered out
+		if (this.filterPrize && !prizes.includes(this.filterPrize)) {
+			prizes.unshift(this.filterPrize);
+		}
+		return prizes;
 	}
 
 	/**
-	 * Computed: Unique list names from all winners
+	 * Computed: Unique list names (cascading - respects other active filters)
 	 */
 	get uniqueLists(): string[] {
-		return [...new Set(dataStore.winners.map((w) => w.listName))].sort();
+		const items = this.getItemsExcludingFilter('list');
+		const lists = [...new Set(items.map((w) => w.listName))].sort();
+		// Always include currently selected value even if filtered out
+		if (this.filterList && !lists.includes(this.filterList)) {
+			lists.unshift(this.filterList);
+		}
+		return lists;
 	}
 
 	/**
-	 * Computed: Unique batches with labels
+	 * Computed: Unique batches with labels (cascading - respects other active filters)
 	 */
 	get uniqueBatches(): Array<{ id: string; label: string }> {
+		const items = this.getItemsExcludingFilter('batch');
 		const batches = new Map<string, string>();
-		for (const winner of dataStore.winners) {
+		for (const winner of items) {
 			if (winner.historyId && !batches.has(winner.historyId)) {
 				const date = new Date(winner.timestamp).toLocaleDateString();
 				batches.set(winner.historyId, `${date} - ${winner.prize}`);
 			}
 		}
-		return Array.from(batches.entries())
+		const result = Array.from(batches.entries())
 			.map(([id, label]) => ({ id, label }))
 			.sort((a, b) => b.id.localeCompare(a.id));
+		// Always include currently selected value even if filtered out
+		if (this.filterBatch && !result.find((b) => b.id === this.filterBatch)) {
+			result.unshift({ id: this.filterBatch, label: this.filterBatch });
+		}
+		return result;
 	}
 
 	/**

@@ -19,10 +19,18 @@
 	// Modal state
 	let deleteListModal: ConfirmModal;
 	let deletePrizeModal: ConfirmModal;
+	let prizeFormModal: FormModal;
 	let importModal: FormModal;
 	let pendingDeleteList: List | null = $state(null);
 	let pendingDeletePrize: Prize | null = $state(null);
 	let showImportWizard = $state(false);
+
+	// Prize form state
+	let editingPrize: Prize | null = $state(null);
+	let prizeName = $state('');
+	let prizeQuantity = $state(1);
+	let prizeDescription = $state('');
+	let prizeWinnersCount = $state(1);
 
 	// Load data on mount
 	onMount(async () => {
@@ -54,9 +62,35 @@
 	}
 
 	// Prize actions
+	function handleAddPrize() {
+		editingPrize = null;
+		prizeName = '';
+		prizeQuantity = 1;
+		prizeDescription = '';
+		prizeWinnersCount = 1;
+		prizeFormModal?.show();
+	}
+
 	function handleEditPrize(prize: Prize) {
-		console.log('Edit prize:', prize.prizeId);
-		// TODO: Open edit prize modal
+		editingPrize = prize;
+		prizeName = prize.name;
+		prizeQuantity = prize.quantity;
+		prizeDescription = prize.description || '';
+		prizeWinnersCount = prize.winnersCount || 1;
+		prizeFormModal?.show();
+	}
+
+	async function handleSavePrize() {
+		const prizeData = {
+			prizeId: editingPrize?.prizeId || crypto.randomUUID(),
+			name: prizeName.trim(),
+			quantity: prizeQuantity,
+			description: prizeDescription.trim() || undefined,
+			winnersCount: prizeWinnersCount,
+			timestamp: editingPrize?.timestamp || Date.now(),
+			templateId: editingPrize?.templateId
+		};
+		await dataStore.save('prizes', prizeData);
 	}
 
 	function handleDeletePrize(prize: Prize) {
@@ -78,11 +112,32 @@
 		<header class="selection-header">
 			<div class="d-flex align-items-center gap-2">
 				<h1 class="h5 mb-0 text-white">Winner Selection</h1>
+				{#if setupStore.selectedPrizeId}
+					<span class="badge bg-warning text-dark">
+						<i class="bi bi-trophy me-1"></i>{setupStore.prizeDisplayText}
+					</span>
+				{/if}
 			</div>
-			<button class="btn btn-light btn-sm" onclick={() => uiStore.showManagement()}>
-				<i class="bi bi-gear"></i>
-				<span class="d-none d-sm-inline ms-1">Manage</span>
-			</button>
+			<div class="d-flex align-items-center gap-2">
+				<button
+					class="btn btn-outline-light btn-sm"
+					onclick={() => {
+						if (document.fullscreenElement) {
+							document.exitFullscreen();
+						} else {
+							document.documentElement.requestFullscreen();
+						}
+					}}
+					title="Toggle fullscreen"
+					aria-label="Toggle fullscreen mode"
+				>
+					<i class="bi bi-arrows-fullscreen"></i>
+				</button>
+				<button class="btn btn-light btn-sm" onclick={() => uiStore.showManagement()}>
+					<i class="bi bi-gear"></i>
+					<span class="d-none d-sm-inline ms-1">Manage</span>
+				</button>
+			</div>
 		</header>
 
 		<SelectionView />
@@ -233,7 +288,7 @@
 							<h5 class="card-title mb-0">
 								<i class="bi bi-trophy me-2"></i>Prizes
 							</h5>
-							<button class="btn btn-primary btn-sm">
+							<button class="btn btn-primary btn-sm" onclick={handleAddPrize}>
 								<i class="bi bi-plus"></i> Add Prize
 							</button>
 						</div>
@@ -456,6 +511,43 @@
 											Prevent same person winning same prize twice
 										</label>
 									</div>
+									<div class="form-check mb-2">
+										<input
+											type="checkbox"
+											class="form-check-input"
+											id="hideEntryCounts"
+											checked={settingsStore.hideEntryCounts}
+											onchange={(e) => (settingsStore.hideEntryCounts = e.currentTarget.checked)}
+										/>
+										<label class="form-check-label" for="hideEntryCounts">
+											Hide entry counts in public view
+										</label>
+									</div>
+									<h6 class="mt-3">Developer</h6>
+									<div class="form-check mb-2">
+										<input
+											type="checkbox"
+											class="form-check-input"
+											id="enableDebugLogs"
+											checked={settingsStore.enableDebugLogs}
+											onchange={(e) => (settingsStore.enableDebugLogs = e.currentTarget.checked)}
+										/>
+										<label class="form-check-label" for="enableDebugLogs">
+											Enable debug logs
+										</label>
+									</div>
+									<div class="form-check mb-2">
+										<input
+											type="checkbox"
+											class="form-check-input"
+											id="enableWebhook"
+											checked={settingsStore.enableWebhook}
+											onchange={(e) => (settingsStore.enableWebhook = e.currentTarget.checked)}
+										/>
+										<label class="form-check-label" for="enableWebhook">
+											Enable webhook notifications
+										</label>
+									</div>
 								</div>
 								<div class="col-md-6">
 									<h6>Theme</h6>
@@ -515,6 +607,60 @@
 	onConfirm={confirmDeletePrize}
 	bind:this={deletePrizeModal}
 />
+
+<FormModal
+	id="prize-form-modal"
+	title={editingPrize ? 'Edit Prize' : 'Add Prize'}
+	submitText={editingPrize ? 'Save Changes' : 'Add Prize'}
+	onSubmit={handleSavePrize}
+	bind:this={prizeFormModal}
+>
+	<div class="mb-3">
+		<label class="form-label" for="prize-name">Prize Name <span class="text-danger">*</span></label>
+		<input
+			type="text"
+			class="form-control"
+			id="prize-name"
+			bind:value={prizeName}
+			required
+			placeholder="e.g., Grand Prize, Gift Card"
+		/>
+	</div>
+	<div class="row g-3 mb-3">
+		<div class="col-6">
+			<label class="form-label" for="prize-quantity">Quantity <span class="text-danger">*</span></label>
+			<input
+				type="number"
+				class="form-control"
+				id="prize-quantity"
+				bind:value={prizeQuantity}
+				required
+				min="0"
+			/>
+		</div>
+		<div class="col-6">
+			<label class="form-label" for="prize-winners">Default Winners</label>
+			<input
+				type="number"
+				class="form-control"
+				id="prize-winners"
+				bind:value={prizeWinnersCount}
+				min="1"
+			/>
+			<small class="text-muted">Pre-fills selection count</small>
+		</div>
+	</div>
+	<div class="mb-3">
+		<label class="form-label" for="prize-description">Description</label>
+		<textarea
+			class="form-control"
+			id="prize-description"
+			bind:value={prizeDescription}
+			rows="2"
+			placeholder="Optional description..."
+		></textarea>
+	</div>
+</FormModal>
 
 <style>
 	/* Additional component-specific styles */

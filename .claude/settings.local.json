@@ -41,7 +41,9 @@
       "Bash(npx svelte-kit:*)",
       "Bash(npx svelte-check:*)",
       "WebFetch(domain:svelte.dev)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "WebFetch(domain:www.eztexting.com)",
+      "WebFetch(domain:developers.eztexting.com)"
     ],
     "deny": [],
     "additionalDirectories": []

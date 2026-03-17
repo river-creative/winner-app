@@ -1,7 +1,14 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 
-import { sendMessage, getMessageReport } from '../services/texting.js';
+import {
+  sendMessage,
+  getMessageReport,
+  queueAndSend,
+  readJobs,
+  processQueue,
+  getJobStats
+} from '../services/texting.js';
 import { strictLimiter } from '../middleware.js';
 
 export const textingRouter = express.Router();
@@ -23,6 +30,30 @@ textingRouter.post('/texting', strictLimiter, async (req: Request, res: Response
 
       case 'getMessageReport':
         result = await getMessageReport(data);
+        break;
+
+      // New: Queue and send with server-side tracking
+      case 'queueAndSend':
+        if (!data.winnerId || !data.phoneNumber || !data.message) {
+          throw new Error('winnerId, phoneNumber, and message are required');
+        }
+        result = await queueAndSend(data.winnerId, data.phoneNumber, data.message);
+        break;
+
+      // New: Get all jobs
+      case 'getJobs':
+        result = await readJobs();
+        break;
+
+      // New: Process pending jobs manually
+      case 'processQueue':
+        const processed = await processQueue();
+        result = { processed };
+        break;
+
+      // New: Get job statistics
+      case 'getJobStats':
+        result = await getJobStats();
         break;
 
       default:

@@ -657,25 +657,25 @@ body {
   }
 }
 
-/* Display Effect Classes */
+/* Display Effect Classes - use 'both' fill-mode to stay invisible during animation-delay */
 .winner-card.fade-in {
-  animation: fadeIn 0.6s ease-out forwards;
+  animation: fadeIn 0.6s ease-out both;
 }
 
 .winner-card.fly-in {
-  animation: flyIn 0.6s ease-out forwards;
+  animation: flyIn 0.6s ease-out both;
 }
 
 .winner-card.zoom-in {
-  animation: zoomIn 0.6s ease-out forwards;
+  animation: zoomIn 0.6s ease-out both;
 }
 
 .winner-card.slide-in {
-  animation: slideInUp 0.6s ease-out forwards;
+  animation: slideInUp 0.6s ease-out both;
 }
 
 .winner-card.bounce-in {
-  animation: bounceIn 0.8s ease-out forwards;
+  animation: bounceIn 0.8s ease-out both;
 }
 
 /* Stable Grid: Placeholder state for cards before reveal */
@@ -1020,7 +1020,7 @@ body {
 .btn {
   border-radius: 10px;
   font-weight: 500;
-  padding: 0.75rem 1.5rem;
+  padding: 0.5rem 1.0rem;
   transition: all 0.3s ease;
 }
 
@@ -1790,6 +1790,47 @@ body {
 [data-theme="dark"] .card-subtitle {
   color: var(--primary-color) !important;
   opacity: 0.8;
+}
+
+/* Theme badge styles */
+.badge-primary-theme {
+  background: var(--color-primary, var(--primary-color));
+  color: white;
+}
+
+.badge-secondary-theme {
+  background: var(--color-secondary, var(--secondary-color));
+  color: white;
+}
+
+/* Prize dropdown themed styles */
+.dropdown-item.active,
+.dropdown-item:active {
+  background: linear-gradient(135deg, var(--color-primary, var(--primary-color)), var(--color-secondary, var(--secondary-color)));
+  color: white;
+}
+
+.dropdown-item.active .text-muted,
+.dropdown-item:active .text-muted {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.dropdown-item.active .badge-primary-theme,
+.dropdown-item:active .badge-primary-theme {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.dropdown-item.active .badge-secondary-theme,
+.dropdown-item:active .badge-secondary-theme {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dropdown-item:hover:not(.active) {
+  background: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.dropdown-item:focus {
+  background: rgba(var(--bs-primary-rgb), 0.15);
 }
 
 /* Selection styles - uses selection theme color */

@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { ROOT_DIR, DIST_DIR, UPLOADS_DIR, PORT } from './config.js';
 import { ensureDataDir } from './services/collection.js';
 import { apiRouter } from './routes/router.js';
+import { startTextingScheduler } from './services/texting-scheduler.js';
 import {
   corsMiddleware,
   helmetMiddleware,
@@ -44,7 +45,7 @@ mainRouter.use('/uploads', express.static(UPLOADS_DIR));
 
 // Login page (public)
 mainRouter.get('/login', (req: Request, res: Response) => {
-  res.sendFile(path.join(DIST_DIR, 'login.html'));
+  res.sendFile(path.join(ROOT_DIR, 'login.html'));
 });
 
 // Route for conditions page (public)
@@ -94,6 +95,7 @@ app.use('/win', mainRouter);
 
 async function startServer(): Promise<void> {
   await ensureDataDir();
+  startTextingScheduler();
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
