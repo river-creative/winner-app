@@ -4,7 +4,7 @@
 # This script syncs files to the server and rebuilds the Docker container
 
 # Configuration
-SERVER="tickets.revival.com"
+SERVER="win.revival.com"
 REMOTE_PATH="/srv/win/"
 LOCAL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/"
 REMOTE_USER="root"
@@ -42,11 +42,9 @@ ssh ${REMOTE_USER}@${SERVER} << 'ENDSSH'
 cd /srv/win/
 echo "Current directory: $(pwd)"
 
-# Stop and remove existing container
-echo "Stopping existing container..."
-docker-compose down
-
-# Rebuild the container
+# Rebuild and swap the container only after the new image builds successfully.
+# No pre-build `docker-compose down`: the old container keeps serving during the
+# build, so a failed build leaves production untouched instead of taking it down.
 echo "Building new container..."
 docker-compose up -d --build
 
@@ -73,7 +71,7 @@ ENDSSH
 if [ $? -eq 0 ]; then
     echo ""
     echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
-    echo -e "Access the app at: ${GREEN}https://tickets.revival.com/win${NC}"
+    echo -e "Access the app at: ${GREEN}https://win.revival.com${NC}"
 else
     echo -e "${RED}❌ Docker rebuild failed${NC}"
     exit 1
