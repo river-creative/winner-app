@@ -66,8 +66,9 @@ async function initializeScanApp() {
       if (isStarting) store.scanStatus = 'Starting camera…';
     };
 
-    Scanner.onEngineSelected = (engine) => {
+    Scanner.onEngineSelected = (engine, reason) => {
       store.scannerEngine = engine;
+      store.scannerReason = reason || '';
     };
 
     // Override store methods with real implementations

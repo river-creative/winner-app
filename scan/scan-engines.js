@@ -201,9 +201,11 @@ class WasmEngine extends FrameLoopEngine {
 // --- JS fallback engine (Tier 3) --------------------------------------------
 
 class JsEngine {
-  constructor() {
+  constructor(downgradeReason = '') {
     this.name = 'js';
     this.scanner = null;
+    // Why we fell back to this weak engine (shown in the warning banner / logged).
+    this.downgradeReason = downgradeReason;
   }
 
   async start(videoElement, onResult) {
@@ -245,6 +247,28 @@ function isWasmSupported() {
   return typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function';
 }
 
+// zxing-wasm v3 ships a SIMD-only build. WebKit only shipped WASM SIMD in Safari/iOS
+// 16.4, and early 16.4.x builds had buggy SIMD — on those, instantiation throws. Detect
+// it up front (a 47-byte module that uses a v128 instruction) so we can give a clear
+// reason instead of a cryptic CompileError.
+function isWasmSimdSupported() {
+  try {
+    return WebAssembly.validate(new Uint8Array([
+      0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0,
+      10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11
+    ]));
+  } catch {
+    return false;
+  }
+}
+
+function describeError(error) {
+  if (!error) return 'unknown';
+  const name = error.name || 'Error';
+  const message = error.message || String(error);
+  return `${name}: ${message}`.slice(0, 160);
+}
+
 /**
  * Pick and instantiate the best scanning engine the device supports, downgrading
  * gracefully if a higher tier turns out to be unavailable at runtime.
@@ -263,17 +287,23 @@ export async function createScanEngine({ skipNative = false } = {}) {
     }
   }
 
-  // Tier 2 — zxing-wasm. Instantiate up front so we only commit to this tier if the wasm
-  // module actually loads (CSP, network or a very old engine could all fail here).
-  if (isWasmSupported()) {
+  // Tier 2 — zxing-wasm. Requires WASM + SIMD; instantiate up front so we only commit to
+  // this tier if the module actually loads (SIMD/CSP/network can all fail here).
+  let wasmReason = '';
+  if (!isWasmSupported()) {
+    wasmReason = 'WebAssembly unsupported';
+  } else if (!isWasmSimdSupported()) {
+    wasmReason = 'WASM SIMD unsupported (needs iOS/Safari 16.4+)';
+  } else {
     try {
       await prepareZXingModule({ overrides: ZXING_OVERRIDES, fireImmediately: true });
       return new WasmEngine();
     } catch (error) {
-      console.warn('WebAssembly scanner failed to load, falling back to JS scanner:', error);
+      wasmReason = describeError(error);
     }
   }
 
   // Tier 3 — pure-JS fallback.
-  return new JsEngine();
+  console.warn('Enhanced (WASM) scanner unavailable, using JS fallback:', wasmReason);
+  return new JsEngine(wasmReason);
 }

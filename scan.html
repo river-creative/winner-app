@@ -50,7 +50,10 @@
                role="status" aria-live="polite"
                x-show="$store.scan.scannerEngine === 'js'" x-transition>
             <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-            <span class="small">This device doesn't support the enhanced scanner. Using the basic scanner — low-light scanning may be limited.</span>
+            <span class="small">
+              This device doesn't support the enhanced scanner. Using the basic scanner — low-light scanning may be limited.
+              <span class="d-block text-muted mt-1" style="font-size: 0.7rem;" x-show="$store.scan.scannerReason" x-text="'Reason: ' + $store.scan.scannerReason"></span>
+            </span>
           </div>
           <h5 class="card-title mb-3">Scan QR Code</h5>
           <!-- Video element for camera -->
@@ -343,6 +346,7 @@
         isScanning: false,
         isStarting: false,
         scannerEngine: '', // active tier: 'native' | 'wasm' | 'js'
+        scannerReason: '', // why the enhanced scanner was unavailable (diagnostic)
         scanStatus: 'Camera not started',
 
         // Search state

@@ -53,7 +53,7 @@ class ScannerModule {
     this.onStartingChange?.(true);
     try {
       this.engine = await createScanEngine(options);
-      this.onEngineSelected?.(this.engine.name);
+      this.onEngineSelected?.(this.engine.name, this.engine.downgradeReason);
       await this.engine.start(
         this.videoElement,
         (value) => this.handleDecode(value),
