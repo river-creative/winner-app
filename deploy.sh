@@ -6,7 +6,7 @@
 # Configuration
 SERVER="tickets.revival.com"
 REMOTE_PATH="/srv/win/"
-LOCAL_PATH="/Users/kenneth.hb29/projects/winner/"
+LOCAL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/"
 REMOTE_USER="root"
 
 # Colors for output
