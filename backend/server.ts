@@ -4,7 +4,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 
-import { ROOT_DIR, DIST_DIR, UPLOADS_DIR, PORT } from './config.js';
+import { DIST_DIR, UPLOADS_DIR, PORT } from './config.js';
 import { ensureDataDir } from './services/collection.js';
 import { apiRouter } from './routes/router.js';
 import { startTextingScheduler } from './services/texting-scheduler.js';
@@ -45,12 +45,12 @@ mainRouter.use('/uploads', express.static(UPLOADS_DIR));
 
 // Login page (public)
 mainRouter.get('/login', (req: Request, res: Response) => {
-  res.sendFile(path.join(ROOT_DIR, 'login.html'));
+  res.sendFile(path.join(DIST_DIR, 'login.html'));
 });
 
 // Route for conditions page (public)
 mainRouter.get('/conditions', (req: Request, res: Response) => {
-  res.sendFile(path.join(ROOT_DIR, 'conditions.html'));
+  res.sendFile(path.join(DIST_DIR, 'conditions.html'));
 });
 
 // Page auth middleware - redirects to login if not authenticated

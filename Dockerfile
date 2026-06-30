@@ -46,9 +46,6 @@ COPY --from=builder /app/dist ./dist
 # Copy compiled backend (TypeScript compiled to JavaScript in-place)
 COPY --from=builder /app/backend ./backend
 
-# Copy conditions.html
-COPY conditions.html ./
-
 # Copy public assets (if any not in dist)
 COPY public ./public
 
