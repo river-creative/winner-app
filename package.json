@@ -55,6 +55,8 @@
     "mp-js-api": "^0.0.30",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
-    "uuid": "^9.0.1"
+    "qr-scanner": "^1.4.2",
+    "uuid": "^9.0.1",
+    "zxing-wasm": "^3.1.0"
   }
 }
