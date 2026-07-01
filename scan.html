@@ -47,7 +47,7 @@
         <div class="card-body text-center">
           <!-- Fallback warning: shown only when the device can't run the enhanced (WASM/native) scanner -->
           <div class="alert alert-warning d-flex align-items-center text-start gap-2 py-2 mb-3"
-               role="status" aria-live="polite"
+               role="status" aria-live="polite" x-cloak
                x-show="$store.scan.scannerEngine === 'js'" x-transition>
             <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
             <span class="small">
