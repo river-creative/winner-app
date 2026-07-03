@@ -2,9 +2,22 @@
 // LOCAL JSON STORAGE SERVICE
 // ================================
 
+import { showSessionExpired } from './session.js';
+
 // API base path - use relative path to work from any base URL
 // This works whether app is at /, /win, or any other path
 const API_BASE = './api';
+
+// Wrapper for authenticated API calls: surface an expired/invalid session (401) to the
+// user with a re-login prompt instead of letting callers silently swallow it as empty data.
+async function apiFetch(url, options) {
+  const response = await fetch(url, options);
+  if (response.status === 401) {
+    showSessionExpired();
+    throw new Error('Session expired');
+  }
+  return response;
+}
 
 // Collection names matching current schema
 const COLLECTIONS = {
@@ -62,7 +75,7 @@ async function saveToStore(collectionName, data, options = {}) {
     
     // Save to server
     
-    const response = await fetch(`${API_BASE}/${collectionName}`, {
+    const response = await apiFetch(`${API_BASE}/${collectionName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,7 +106,7 @@ async function getFromStore(collectionName, key = null) {
     if (key) {
       // Standard single document retrieval
       const url = `${API_BASE}/${collectionName}/${key}`;
-      const response = await fetch(url);
+      const response = await apiFetch(url);
 
       if (response.status === 404) {
         return null;
@@ -107,7 +120,7 @@ async function getFromStore(collectionName, key = null) {
     }
     
     // If no key provided, get all documents
-    const response = await fetch(`${API_BASE}/${collectionName}`);
+    const response = await apiFetch(`${API_BASE}/${collectionName}`);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -130,7 +143,7 @@ async function deleteFromStore(collectionName, key) {
   try {
     // Delete from server
     
-    const response = await fetch(`${API_BASE}/${collectionName}/${key}`, {
+    const response = await apiFetch(`${API_BASE}/${collectionName}/${key}`, {
       method: 'DELETE'
     });
     
@@ -274,7 +287,7 @@ async function batchFetch(requests) {
   try {
     // Batch fetch collections
     
-    const response = await fetch(`${API_BASE}/batch`, {
+    const response = await apiFetch(`${API_BASE}/batch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -306,7 +319,7 @@ async function batchSave(operations) {
   try {
     // Batch save documents
     
-    const response = await fetch(`${API_BASE}/batch-save`, {
+    const response = await apiFetch(`${API_BASE}/batch-save`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
