@@ -18,8 +18,8 @@ interface Session {
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const sessions = new Map<string, Session>();
 
-// Session duration: 24 hours
-const SESSION_DURATION = 24 * 60 * 60 * 1000;
+// Session duration: 3 days
+const SESSION_DURATION = 3 * 24 * 60 * 60 * 1000;
 
 // Load persisted sessions on startup, dropping any that have already expired.
 function loadSessions(): void {
