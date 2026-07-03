@@ -68,6 +68,9 @@ async function deleteListConfirm(listId) {
           UI.showToast('List deleted', 'success');
         }
         await loadLists(); // Updates Alpine store reactively
+        // Drop the removed list from the persisted draw selection so the
+        // public view can't show phantom selections (stale count / wrong name).
+        window.Alpine?.store('setup')?.deselectList(listId);
       } catch (error) {
         console.error('Error deleting list:', error);
         UI.showToast('Error deleting list: ' + error.message, 'error');
@@ -86,6 +89,9 @@ function archiveListConfirm(listId) {
         await Database.archiveList(listId);
         UI.showToast('List archived', 'success');
         await loadLists(); // Updates Alpine store reactively
+        // Drop the archived list from the persisted draw selection so the
+        // public view can't show phantom selections (stale count / wrong name).
+        window.Alpine?.store('setup')?.deselectList(listId);
       } catch (error) {
         console.error('Error archiving list:', error);
         UI.showToast('Error archiving list: ' + error.message, 'error');

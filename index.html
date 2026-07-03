@@ -2507,18 +2507,19 @@
         },
 
         get canStart() {
-          return this.selectedListIds.length > 0 && this.selectedPrizeId;
+          return this.validSelectedIds.length > 0 && this.selectedPrizeId;
         },
 
         get listDisplayText() {
           const dataStore = Alpine.store('data');
           if (!dataStore || !dataStore.lists) return 'Not Selected';
-          if (this.selectedListIds.length === 0) return 'Not Selected';
-          if (this.selectedListIds.length === 1) {
-            const list = dataStore.lists.find(l => l.listId === this.selectedListIds[0]);
+          const validIds = this.validSelectedIds;
+          if (validIds.length === 0) return 'Not Selected';
+          if (validIds.length === 1) {
+            const list = dataStore.lists.find(l => l.listId === validIds[0]);
             return list?.metadata?.name || 'Unknown';
           }
-          return `${this.selectedListIds.length} Lists Selected`;
+          return `${validIds.length} Lists Selected`;
         },
 
         get selectedPrize() {
@@ -2541,7 +2542,7 @@
         },
 
         get entriesExceeded() {
-          if (this.selectedListIds.length === 0) return false;
+          if (this.validSelectedIds.length === 0) return false;
           return this.winnersCount > this.eligibleEntries;
         },
 
@@ -2555,11 +2556,17 @@
           return this.entriesExceeded || this.prizeQuantityExceeded;
         },
 
-        get validSelectedCount() {
+        // Selected IDs that still correspond to an existing list. Guards every
+        // display/gating getter against stale IDs (deleted list, restored old
+        // settings, cross-device delete) so the UI never shows phantom selections.
+        get validSelectedIds() {
           const dataStore = Alpine.store('data');
-          if (!dataStore?.lists) return 0;
-          const validIds = dataStore.lists.map(l => l.listId);
-          return this.selectedListIds.filter(id => validIds.includes(id)).length;
+          if (!dataStore?.lists) return [];
+          return this.selectedListIds.filter(id => dataStore.lists.some(l => l.listId === id));
+        },
+
+        get validSelectedCount() {
+          return this.validSelectedIds.length;
         },
 
         isListSelected(listId) {
