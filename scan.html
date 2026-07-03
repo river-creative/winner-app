@@ -45,15 +45,19 @@
     <div x-show="$store.scan.view === 'scanner'" x-transition>
       <div class="card">
         <div class="card-body text-center">
-          <!-- Fallback warning: shown only when the device can't run the enhanced (WASM/native) scanner -->
-          <div class="alert alert-warning d-flex align-items-center text-start gap-2 py-2 mb-3"
-               role="status" aria-live="polite" x-cloak
-               x-show="$store.scan.scannerEngine === 'js'" x-transition>
-            <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
-            <span class="small">
-              This device doesn't support the enhanced scanner. Using the basic scanner — low-light scanning may be limited.
-              <span class="d-block text-muted mt-1" style="font-size: 0.7rem;" x-show="$store.scan.scannerReason" x-text="'Reason: ' + $store.scan.scannerReason"></span>
-            </span>
+          <!-- Fallback warning: shown only when the enhanced (WASM/native) scanner is unavailable.
+               x-show MUST sit on an element WITHOUT a Bootstrap display utility: .d-flex/.d-block use
+               `display: … !important`, which overrides Alpine's inline `display:none` and would keep the
+               banner permanently visible. So x-show/x-cloak live on this plain wrapper; d-flex is inside. -->
+          <div class="mb-3" x-cloak x-show="$store.scan.scannerEngine === 'js'" x-transition>
+            <div class="alert alert-warning d-flex align-items-center text-start gap-2 py-2 mb-0"
+                 role="status" aria-live="polite">
+              <i class="bi bi-exclamation-triangle-fill flex-shrink-0"></i>
+              <span class="small">
+                This device doesn't support the enhanced scanner. Using the basic scanner — low-light scanning may be limited.
+                <span class="text-muted mt-1" style="display: block; font-size: 0.7rem;" x-show="$store.scan.scannerReason" x-text="'Reason: ' + $store.scan.scannerReason"></span>
+              </span>
+            </div>
           </div>
           <h5 class="card-title mb-3">Scan QR Code</h5>
           <!-- Video element for camera -->
