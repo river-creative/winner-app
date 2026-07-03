@@ -23,8 +23,6 @@ let settings = {
   selectionColor: '#10b981',
   backgroundType: 'gradient',
   customBackgroundImage: null,
-  selectedPrizeId: '',
-  winnersCount: 1,
   enableWebhook: false,
   webhookUrl: '',
   selectionMode: 'all-at-once',
@@ -185,8 +183,6 @@ async function handleSaveSettings() {
     };
 
     const selectionState = {
-      selectedPrizeId: document.getElementById('quickPrizeSelect')?.value || settings.selectedPrizeId,
-      winnersCount: parseInt(document.getElementById('quickWinnersCount')?.value) || settings.winnersCount,
       selectionMode: document.getElementById('selectionMode')?.value || settings.selectionMode,
       preSelectionDelay: parseFloat(document.getElementById('preSelectionDelay')?.value) || settings.preSelectionDelay,
       delayVisualType: document.getElementById('delayVisualType')?.value || settings.delayVisualType,
@@ -317,14 +313,8 @@ function loadSettingsToForm() {
     }
   }
 
-  // Note: quickListSelect is now handled by Alpine x-for in index.html
-  const quickPrizeSelect = document.getElementById('quickPrizeSelect');
-  const quickWinnersCount = document.getElementById('quickWinnersCount');
-  if (quickPrizeSelect && settings.selectedPrizeId) {
-    quickPrizeSelect.value = settings.selectedPrizeId;
-  }
-  // winnersCount is now managed by Alpine store with persistence
-  // Don't overwrite - it would bypass the capped value
+  // Quick-setup list/prize/winners are owned by the Alpine `setup` store
+  // (x-for + x-model with persistence) — no form loading needed here.
 
   // Load new selection settings
   const selectionMode = document.getElementById('selectionMode');
@@ -836,8 +826,6 @@ async function autoSaveQuickSetup(triggerElementId = null) {
     
     // Only include settings that have actually changed
     const fieldMappings = {
-      'quickPrizeSelect': 'selectedPrizeId',
-      'quickWinnersCount': 'winnersCount',
       'selectionMode': 'selectionMode',
       'preSelectionDelay': 'preSelectionDelay',
       'delayVisualType': 'delayVisualType',
@@ -868,9 +856,7 @@ async function autoSaveQuickSetup(triggerElementId = null) {
         debugLog(`Checking field ${elementId} (${settingKey}): element.value="${element.value}", current setting="${settings[settingKey]}"`);
         
         let newValue;
-        if (settingKey === 'winnersCount') {
-          newValue = parseInt(element.value) || settings[settingKey];
-        } else if (settingKey === 'preSelectionDelay' || settingKey === 'displayDuration' || settingKey === 'celebrationDuration') {
+        if (settingKey === 'preSelectionDelay' || settingKey === 'displayDuration' || settingKey === 'celebrationDuration') {
           newValue = parseFloat(element.value);
           // Allow 0 as a valid value, only use fallback for NaN
           if (isNaN(newValue)) {
@@ -1200,8 +1186,6 @@ function setupQuickSetupAutoSave() {
   cleanupEventListeners();
   
   const quickFields = [
-    'quickPrizeSelect',
-    'quickWinnersCount',
     'selectionMode',
     'preSelectionDelay',
     'delayVisualType',
