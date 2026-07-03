@@ -302,59 +302,17 @@ function setupInterfaceToggles() {
 }
 
 function setupQuickSelection() {
-  // Quick selection fields (quickListSelect, quickPrizeSelect, quickWinnersCount) 
-  // are now handled by the unified Settings.setupQuickSetupAutoSave() system
-
+  // List / prize / winner-count selection is handled reactively by the Alpine
+  // `setup` store (see index.html) — the checkboxes, cards, Select All/Clear All
+  // buttons, and displays all bind to it. Only the public-view action buttons
+  // need imperative wiring here.
   const bigPlayButton = document.getElementById('bigPlayButton');
   const newSelectionBtn = document.getElementById('newSelectionBtn');
   const undoSelectionBtn = document.getElementById('undoSelectionBtn');
-  const selectAllLists = document.getElementById('selectAllLists');
-  const clearAllLists = document.getElementById('clearAllLists');
 
   if (bigPlayButton) bigPlayButton.addEventListener('click', Selection.handleBigPlayClick);
   if (newSelectionBtn) newSelectionBtn.addEventListener('click', Winners.resetToSelectionMode);
   if (undoSelectionBtn) undoSelectionBtn.addEventListener('click', Winners.undoLastSelection);
-  
-  // Add Select All/Clear All functionality
-  if (selectAllLists) {
-    selectAllLists.addEventListener('click', () => {
-      document.querySelectorAll('#quickListSelect .list-checkbox').forEach(cb => {
-        cb.checked = true;
-      });
-      UI.updateListSelectionCount();
-      UI.updateSelectionInfo(); // Update the display info
-      // Save the selection
-      const selectedIds = Array.from(document.querySelectorAll('#quickListSelect .list-checkbox:checked'))
-        .map(cb => cb.value);
-      Settings.saveSingleSetting('selectedListIds', selectedIds);
-    });
-  }
-  
-  if (clearAllLists) {
-    clearAllLists.addEventListener('click', () => {
-      document.querySelectorAll('#quickListSelect .list-checkbox').forEach(cb => {
-        cb.checked = false;
-      });
-      UI.updateListSelectionCount();
-      UI.updateSelectionInfo(); // Update the display info
-      Settings.saveSingleSetting('selectedListIds', []);
-    });
-  }
-  
-  // Add change listener for checkboxes (using event delegation)
-  const quickListSelect = document.getElementById('quickListSelect');
-  if (quickListSelect) {
-    quickListSelect.addEventListener('change', async (e) => {
-      if (e.target.classList.contains('list-checkbox')) {
-        UI.updateListSelectionCount();
-        await UI.updateSelectionInfo(); // Update the display info
-        // Save the selection
-        const selectedIds = Array.from(document.querySelectorAll('#quickListSelect .list-checkbox:checked'))
-          .map(cb => cb.value);
-        Settings.saveSingleSetting('selectedListIds', selectedIds);
-      }
-    });
-  }
 }
 
 function setupManagementListeners() {
@@ -405,9 +363,6 @@ function setupManagementListeners() {
 
   // Setup SMS template character counter
   Settings.setupSMSTemplateCounter();
-  
-  // Update SMS placeholders based on selected list
-  Settings.updateSMSPlaceholders();
 
   // Setup auto-save for quick setup fields
   Settings.setupQuickSetupAutoSave();

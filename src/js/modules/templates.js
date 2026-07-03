@@ -1,7 +1,6 @@
 // Templates Module - Manages SMS templates
 import { Database } from './database.js';
 import { UI } from './ui.js';
-import { Settings, settings } from './settings.js';
 import eventManager from './event-manager.js';
 
 // Get available placeholders from lists
@@ -15,11 +14,13 @@ async function getAvailablePlaceholders() {
     fieldSet.add('ticketCode');
     fieldSet.add('eventName');
     
-    // Try to get fields from selected lists first
-    if (settings && settings.selectedListIds && settings.selectedListIds.length > 0) {
+    // Try to get fields from selected lists first (Alpine setup store is the
+    // single source of truth for the current draw selection).
+    const selectedIds = window.Alpine?.store('setup')?.selectedListIds || [];
+    if (selectedIds.length > 0) {
       const lists = await Database.getFromStore('lists');
-      const selectedLists = lists.filter(list => 
-        settings.selectedListIds.includes(list.listId)
+      const selectedLists = lists.filter(list =>
+        selectedIds.includes(list.listId)
       );
       
       if (selectedLists.length > 0) {

@@ -206,8 +206,8 @@
                       </div>
                       <div class="d-flex justify-content-between align-items-center mt-2">
                         <div class="list-selection-controls">
-                          <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllLists">Select All</button>
-                          <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllLists">Clear All</button>
+                          <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllLists" @click="$store.setup.selectAllLists()">Select All</button>
+                          <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllLists" @click="$store.setup.clearSelectedLists()">Clear All</button>
                           <span class="ms-2 text-muted" x-text="$store.setup.validSelectedCount + ' selected'"></span>
                         </div>
                         <small class="text-muted">Eligible: <span x-text="$store.setup.eligibleEntries.toLocaleString() + ($store.setup.excludedCount > 0 ? ' (' + $store.setup.excludedCount + ' excluded)' : '')">0</span></small>
@@ -540,10 +540,10 @@
               </div>
               <div class="d-flex align-items-center gap-2">
                 <div class="btn-group btn-group-sm" x-show="$store.data.lists.length > 0">
-                  <button type="button" class="btn btn-outline-secondary" id="selectAllListsTab">
+                  <button type="button" class="btn btn-outline-secondary" id="selectAllListsTab" @click="$store.setup.selectAllLists()">
                     <i class="bi bi-check-square me-1"></i>Select All
                   </button>
-                  <button type="button" class="btn btn-outline-secondary" id="clearAllListsTab">
+                  <button type="button" class="btn btn-outline-secondary" id="clearAllListsTab" @click="$store.setup.clearSelectedLists()">
                     <i class="bi bi-square me-1"></i>Clear All
                   </button>
                 </div>
@@ -2603,6 +2603,17 @@
             this.selectedListIds = this.selectedListIds.filter(id => id !== listId);
           }
           this.capWinnersCount(); // Cap immediately after list change
+        },
+
+        selectAllLists() {
+          const dataStore = Alpine.store('data');
+          this.selectedListIds = (dataStore?.lists || []).map(l => l.listId);
+          this.capWinnersCount(); // Cap immediately after list change
+        },
+
+        clearSelectedLists() {
+          this.selectedListIds = [];
+          this.capWinnersCount(); // Cap immediately after list change
         }
       });
 
@@ -3398,10 +3409,10 @@
           const fieldSet = new Set(['name', 'prize', 'ticketCode', 'eventName']);
           try {
             const lists = await Database.getFromStore('lists');
-            const settingsData = Settings.data;
+            const selectedIds = Alpine.store('setup').selectedListIds;
 
-            const selectedLists = settingsData?.selectedListIds?.length > 0
-              ? lists.filter(list => settingsData.selectedListIds.includes(list.listId))
+            const selectedLists = selectedIds.length > 0
+              ? lists.filter(list => selectedIds.includes(list.listId))
               : lists;
 
             selectedLists.forEach(list => {

@@ -8,7 +8,6 @@ import eventManager from './event-manager.js';
 // UI UTILITIES & MODALS
 // ================================
 
-import { Database } from './database.js';
 import { settings } from './settings.js'; // Import settings directly
 
 function generateId(length = 10) {
@@ -181,146 +180,6 @@ async function syncUI() {
   }
 }
 
-async function updateSelectionInfo() {
-  const quickListSelect = document.getElementById('quickListSelect');
-  const quickPrizeSelect = document.getElementById('quickPrizeSelect');
-  const quickWinnersCount = document.getElementById('quickWinnersCount');
-
-  if (!quickListSelect || !quickPrizeSelect || !quickWinnersCount) return;
-
-  // Get selected lists from checkboxes
-  const selectedCheckboxes = quickListSelect.querySelectorAll('.list-checkbox:checked');
-  const selectedListNames = [];
-  let totalEntryCount = 0;
-  
-  selectedCheckboxes.forEach(checkbox => {
-    const label = quickListSelect.querySelector(`label[for="${checkbox.id}"]`);
-    if (label) {
-      const listName = label.textContent.split(' (')[0].trim();
-      selectedListNames.push(listName);
-      totalEntryCount += parseInt(checkbox.dataset.entryCount || 0);
-    }
-  });
-  
-  // Update list display
-  const listText = selectedListNames.length > 0 
-    ? (selectedListNames.length === 1 ? selectedListNames[0] : `${selectedListNames.length} Lists Selected`)
-    : 'Not Selected';
-  
-  const prizeOption = quickPrizeSelect.options[quickPrizeSelect.selectedIndex];
-  const prizeText = prizeOption ? prizeOption.textContent.split(' (')[0] : 'Not Selected';
-  const prizeNameOnly = prizeOption ? prizeOption.textContent.split(' (')[0].trim() : null;
-
-  document.getElementById('currentListDisplay').textContent = listText;
-  document.getElementById('currentPrizeDisplay').textContent = prizeText;
-  document.getElementById('winnersCountDisplay').textContent = quickWinnersCount.value;
-
-  // Calculate eligible entries (excluding same prize winners if setting is enabled)
-  let eligibleEntryCount = totalEntryCount;
-  let excludedCount = 0;
-  
-  // Check if we should filter out same prize winners
-  if (settings?.preventSamePrize && prizeNameOnly && selectedCheckboxes.length > 0) {
-    console.log('Checking for same prize exclusions. Prize:', prizeNameOnly, 'Setting enabled:', settings.preventSamePrize);
-    try {
-      // Get all winners who won this specific prize
-      const winners = await Database.getFromStore('winners');
-      const samePrizeWinnerIds = new Set();
-      
-      if (winners && Array.isArray(winners)) {
-        winners.forEach(winner => {
-          // Only check winners who won this specific prize
-          if (winner.prize === prizeNameOnly) {
-            // Use the entry ID to exclude this winner
-            if (winner.entryId) samePrizeWinnerIds.add(winner.entryId);
-          }
-        });
-        console.log('Found', samePrizeWinnerIds.size, 'previous winners of', prizeNameOnly);
-      }
-      
-      // If we have excluded IDs, we need to fetch the actual lists to count accurately
-      if (samePrizeWinnerIds.size > 0) {
-        const listIds = Array.from(selectedCheckboxes).map(cb => cb.value);
-        const fetchRequests = listIds.map(id => ({ collection: 'lists', id }));
-        const batchResults = await Database.batchFetch(fetchRequests);
-        
-        let actualEligible = 0;
-        for (const listId of listIds) {
-          const list = batchResults[`lists:${listId}`];
-          if (list && list.entries && Array.isArray(list.entries)) {
-            for (const entry of list.entries) {
-              const entryId = entry.id || entry.data?.['Ticket Code'] || entry.data?.ticketCode;
-              if (!entryId || !samePrizeWinnerIds.has(entryId)) {
-                actualEligible++;
-              } else {
-                excludedCount++;
-              }
-            }
-          }
-        }
-        eligibleEntryCount = actualEligible;
-        console.log('Eligible entries after exclusion:', actualEligible, 'Excluded:', excludedCount);
-      }
-    } catch (error) {
-      console.error('Error calculating eligible entries:', error);
-      // Fall back to total count if there's an error
-    }
-  }
-
-  // Update total entries display with excluded count if applicable
-  let displayText = eligibleEntryCount.toLocaleString();
-  if (excludedCount > 0) {
-    displayText += ` (${excludedCount} excluded)`;
-    console.log('Updating display with exclusions:', displayText);
-  }
-  
-  // Update both elements - one in setup tab, one in public view
-  const totalSelectedEntries = document.getElementById('totalSelectedEntries');
-  if (totalSelectedEntries) {
-    totalSelectedEntries.textContent = displayText;
-  }
-  
-  const totalEntriesDisplay = document.getElementById('totalEntriesDisplay');
-  if (totalEntriesDisplay) {
-    totalEntriesDisplay.textContent = displayText;
-  }
-
-  // Check if winners count exceeds available entries and add warning
-  const winnersCount = parseInt(quickWinnersCount.value) || 0;
-  const winnersCountDisplay = document.getElementById('winnersCountDisplay');
-  
-  // Show warning when winners exceed available entries (including when entries are 0)
-  const showWarning = winnersCount > 0 && winnersCount > eligibleEntryCount && selectedCheckboxes.length > 0;
-  
-  // Debug logging
-  console.log('Warning check:', {
-    winnersCount,
-    eligibleEntryCount,
-    totalEntryCount,
-    selectedLists: selectedCheckboxes.length,
-    showWarning
-  });
-  
-  // Warning display is now handled by Alpine in index.html
-  // Remove any old vanilla JS warnings that might exist
-  const oldWarning = quickWinnersCount.parentElement.querySelector('.winners-warning');
-  if (oldWarning) {
-    oldWarning.remove();
-  }
-  
-  // Enable play button only if at least one list and a prize are selected
-  const bigPlayButton = document.getElementById('bigPlayButton');
-  if (bigPlayButton) {
-    bigPlayButton.disabled = selectedCheckboxes.length === 0 || !quickPrizeSelect.value;
-  }
-}
-
-async function updateTotalEntries() {
-  // This function is now handled by updateSelectionInfo() for multiple lists
-  // Keeping it for backward compatibility but just call updateSelectionInfo
-  await updateSelectionInfo();
-}
-
 // Promise-based confirmation modal
 function showConfirmationPromise(title, message) {
   return new Promise((resolve) => {
@@ -390,44 +249,6 @@ function enhancedShowConfirmationModal(title, message, onConfirm) {
   return showConfirmationModal(title, message, onConfirm);
 }
 
-// Update the count and total entries for selected lists
-function updateListSelectionCount() {
-  const checkboxes = document.querySelectorAll('#quickListSelect .list-checkbox:checked');
-  const selectedCount = checkboxes.length;
-  const totalLists = document.querySelectorAll('#quickListSelect .list-checkbox').length;
-  
-  // Update count display
-  const countElement = document.getElementById('selectedListsCount');
-  if (countElement) {
-    countElement.textContent = `${selectedCount} of ${totalLists} lists selected`;
-  }
-  
-  // Calculate total entries and detect duplicates
-  let totalEntries = 0;
-  const allEntryIds = new Set();
-  const duplicateIds = new Set();
-  
-  checkboxes.forEach(checkbox => {
-    const entryCount = parseInt(checkbox.dataset.entryCount || 0);
-    totalEntries += entryCount;
-  });
-  
-  // Update total entries display
-  const totalElement = document.getElementById('totalSelectedEntries');
-  if (totalElement) {
-    totalElement.textContent = totalEntries.toLocaleString();
-  }
-  
-  // Note: Actual duplicate detection will happen when lists are loaded
-  // This is just for UI display
-  const duplicatesElement = document.getElementById('duplicatesRemoved');
-  if (duplicatesElement && duplicateIds.size > 0) {
-    duplicatesElement.textContent = `(${duplicateIds.size} duplicates will be removed)`;
-  } else if (duplicatesElement) {
-    duplicatesElement.textContent = '';
-  }
-}
-
 export const UI = {
   generateId,
   showToast,
@@ -437,10 +258,7 @@ export const UI = {
   showConfirmationModal: enhancedShowConfirmationModal,
   readFileAsText,
   applyVisibilitySettings,
-  syncUI,
-  updateSelectionInfo,
-  updateTotalEntries,
-  updateListSelectionCount
+  syncUI
 };
 
 window.UI = UI;

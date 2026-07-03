@@ -23,7 +23,6 @@ let settings = {
   selectionColor: '#10b981',
   backgroundType: 'gradient',
   customBackgroundImage: null,
-  selectedListIds: [], // Multiple list selection
   selectedPrizeId: '',
   winnersCount: 1,
   enableWebhook: false,
@@ -186,8 +185,6 @@ async function handleSaveSettings() {
     };
 
     const selectionState = {
-      // Get selected list IDs from checkboxes
-      selectedListIds: Array.from(document.querySelectorAll('#quickListSelect .list-checkbox:checked')).map(cb => cb.value) || settings.selectedListIds,
       selectedPrizeId: document.getElementById('quickPrizeSelect')?.value || settings.selectedPrizeId,
       winnersCount: parseInt(document.getElementById('quickWinnersCount')?.value) || settings.winnersCount,
       selectionMode: document.getElementById('selectionMode')?.value || settings.selectionMode,
@@ -383,105 +380,6 @@ function loadSettingsToForm() {
   }
 
   // Load SMS template
-}
-
-// Helper function to safely render placeholders
-function renderPlaceholders(container, placeholders) {
-  if (!container) return;
-  
-  container.textContent = '';
-  const labelText = document.createTextNode('Available placeholders: ');
-  container.appendChild(labelText);
-  
-  placeholders.forEach((p, index) => {
-    const code = document.createElement('code');
-    code.textContent = `{${p}}`;
-    container.appendChild(code);
-    if (index < placeholders.length - 1) {
-      container.appendChild(document.createTextNode(', '));
-    }
-  });
-  
-  container.appendChild(document.createElement('br'));
-  const charCountSpan = document.createElement('span');
-  charCountSpan.id = 'smsCharCount';
-  charCountSpan.textContent = '0 characters, 1 SMS';
-  container.appendChild(charCountSpan);
-  const smsTemplate = document.getElementById('smsTemplate');
-  if (smsTemplate && settings.smsTemplate) {
-    smsTemplate.value = settings.smsTemplate;
-    updateSMSCharCount(); // Update character count display
-  }
-}
-
-// Update available SMS placeholders based on selected list
-function updateSMSPlaceholders() {
-  const placeholdersContainer = document.querySelector('#smsTemplate')?.parentElement?.querySelector('.form-text');
-  if (!placeholdersContainer) {
-    console.log('SMS placeholders container not found');
-    return;
-  }
-  
-  // Default placeholders always available
-  let placeholders = ['name', 'prize', 'ticketCode'];
-  
-  // Try to get the selected list's fields
-  const quickListSelect = document.getElementById('quickListSelect');
-  // Get the first selected checkbox since we're now using checkboxes
-  const firstSelectedCheckbox = quickListSelect?.querySelector('.list-checkbox:checked');
-  if (firstSelectedCheckbox && firstSelectedCheckbox.value) {
-    console.log('Loading list for placeholders:', firstSelectedCheckbox.value);
-    // Get the selected list from the database
-    Database.getFromStore('lists', firstSelectedCheckbox.value).then(list => {
-      console.log('List loaded:', list);
-      if (list && list.entries && list.entries.length > 0) {
-        // Get all unique field names from the first entry
-        const sampleEntry = list.entries[0];
-        // Get keys from the entry's data object (data contains the CSV row)
-        const csvFields = Object.keys(sampleEntry.data || {});
-        console.log('CSV fields found:', csvFields);
-        
-        // Combine default placeholders with CSV fields
-        const allPlaceholders = [...new Set([...placeholders, ...csvFields])];
-        
-        // Update the display safely
-        placeholdersContainer.textContent = '';
-        const labelText = document.createTextNode('Available placeholders: ');
-        placeholdersContainer.appendChild(labelText);
-        
-        allPlaceholders.forEach((p, index) => {
-          const code = document.createElement('code');
-          code.textContent = `{${p}}`;
-          placeholdersContainer.appendChild(code);
-          if (index < allPlaceholders.length - 1) {
-            placeholdersContainer.appendChild(document.createTextNode(', '));
-          }
-        });
-        
-        placeholdersContainer.appendChild(document.createElement('br'));
-        const charCountSpan = document.createElement('span');
-        charCountSpan.id = 'smsCharCount';
-        charCountSpan.textContent = '0 characters, 1 SMS';
-        placeholdersContainer.appendChild(charCountSpan);
-        updateSMSCharCount();
-      } else {
-        console.log('List has no entries or entries is not an array');
-        // Show default placeholders safely
-        renderPlaceholders(placeholdersContainer, placeholders);
-        updateSMSCharCount();
-      }
-    }).catch(err => {
-      console.error('Error loading list for placeholders:', err);
-      // Show default placeholders on error safely
-      renderPlaceholders(placeholdersContainer, placeholders);
-      updateSMSCharCount();
-    });
-  } else {
-    console.log('No list selected');
-    // No list selected, show default placeholders safely
-    renderPlaceholders(placeholdersContainer, placeholders);
-    updateSMSCharCount();
-  }
 }
 
 // Update SMS character count and SMS count display
@@ -938,8 +836,7 @@ async function autoSaveQuickSetup(triggerElementId = null) {
     
     // Only include settings that have actually changed
     const fieldMappings = {
-      'quickListSelect': 'selectedListId',
-      'quickPrizeSelect': 'selectedPrizeId', 
+      'quickPrizeSelect': 'selectedPrizeId',
       'quickWinnersCount': 'winnersCount',
       'selectionMode': 'selectionMode',
       'preSelectionDelay': 'preSelectionDelay',
@@ -1001,13 +898,6 @@ async function autoSaveQuickSetup(triggerElementId = null) {
     if (Object.keys(changedSettings).length > 0) {
       await saveMultipleSettings(changedSettings);
       debugLog('Quick setup auto-saved:', Object.keys(changedSettings));
-      
-      // If quick selection fields changed, update UI displays
-      if (changedSettings.selectedListId !== undefined || 
-          changedSettings.selectedPrizeId !== undefined || 
-          changedSettings.winnersCount !== undefined) {
-        updateQuickSelectionUI();
-      }
     }
   } catch (error) {
     console.error('Error auto-saving quick setup:', error);
@@ -1310,8 +1200,7 @@ function setupQuickSetupAutoSave() {
   cleanupEventListeners();
   
   const quickFields = [
-    'quickListSelect',
-    'quickPrizeSelect', 
+    'quickPrizeSelect',
     'quickWinnersCount',
     'selectionMode',
     'preSelectionDelay',
@@ -1342,29 +1231,8 @@ function setupQuickSetupAutoSave() {
         cleanupFunctions.push(
           eventManager.on(field, 'change', fieldSpecificImmediateSave)
         );
-        
-        // Update SMS placeholders when list changes
-        if (fieldId === 'quickListSelect') {
-          const updatePlaceholdersHandler = () => updateSMSPlaceholders();
-          cleanupFunctions.push(
-            eventManager.on(field, 'change', updatePlaceholdersHandler)
-          );
-        }
       }
-      
-      // Update UI when winner count changes (prize is handled by autoSaveQuickSetup)
-      if (fieldId === 'quickWinnersCount') {
-        const updateUIHandler = async () => {
-          if (UI && UI.updateSelectionInfo) {
-            await UI.updateSelectionInfo();
-          }
-        };
-        cleanupFunctions.push(
-          eventManager.on(field, 'input', updateUIHandler),
-          eventManager.on(field, 'change', updateUIHandler)
-        );
-      }
-      
+
       debugLog(`Quick setup auto-save listener added for: ${fieldId} (type: ${field.type})`);
     }
   });
@@ -1420,15 +1288,6 @@ function debounce(func, wait) {
   };
 }
 
-// Update UI displays when quick selection fields change
-async function updateQuickSelectionUI() {
-  // This function is now handled by UI.updateSelectionInfo()
-  // since we switched to checkboxes for list selection
-  if (UI && UI.updateSelectionInfo) {
-    await UI.updateSelectionInfo();
-  }
-}
-
 // Debug logging utility function
 function debugLog(message, ...args) {
   if (settings.enableDebugLogs) {
@@ -1468,7 +1327,6 @@ export const Settings = {
   setupQuickSetupAutoSave,
   setupAllSettingsAutoSave,
   setupSMSTemplateCounter,
-  updateSMSPlaceholders,
   updateSettings: function(newSettings) { Object.assign(settings, newSettings); },
   debugLog,
   cleanupEventListeners, // Add cleanup function to exports
