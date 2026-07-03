@@ -3,11 +3,6 @@
 // ================================
 import { DOMUtils } from './dom-utils.js';
 import eventManager from './event-manager.js';
-
-// ================================
-// UI UTILITIES & MODALS
-// ================================
-
 import { settings } from './settings.js'; // Import settings directly
 
 function generateId(length = 10) {
