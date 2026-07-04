@@ -5,13 +5,6 @@ import { UI } from '../src/js/modules/ui.js';
 import { Scanner } from './scanner.js';
 import { WinnerSearch } from './winner-search.js';
 
-// Status text reflecting which scanner tier is active.
-function scanningStatus(engine) {
-  if (engine === 'js') return 'Scanning… (basic scanner)';
-  if (engine === 'native' || engine === 'wasm') return 'Scanning… (enhanced)';
-  return 'Scanning for QR codes...';
-}
-
 // Initialize the scan application
 async function initializeScanApp() {
   try {
@@ -58,7 +51,7 @@ async function initializeScanApp() {
 
     Scanner.onScanningChange = (isScanning) => {
       store.isScanning = isScanning;
-      store.scanStatus = isScanning ? scanningStatus(store.scannerEngine) : 'Camera stopped';
+      store.scanStatus = isScanning ? 'Scanning for QR codes...' : 'Camera stopped';
     };
 
     Scanner.onStartingChange = (isStarting) => {
