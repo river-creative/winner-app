@@ -21,6 +21,8 @@
 <body data-theme="light" x-data>
   <!-- Main Public Selection Interface -->
   <div class="public-selection-interface" id="publicInterface" x-show="$store.ui.view === 'public'" x-cloak>
+    <!-- Display stage: the letterboxed "screen" sized to the chosen display ratio -->
+    <div class="display-stage" id="displayStage">
     <!-- Header -->
     <div class="selection-header">
       <div class="d-flex align-items-center">
@@ -88,6 +90,7 @@
         <!-- Winner cards will be inserted here dynamically -->
       </div>
     </div>
+    </div><!-- /.display-stage -->
   </div>
   <!-- Management (Hidden by default) -->
   <div class="container-fluid management-tabs" id="managementInterface" :class="{ 'active': $store.ui.view === 'management' }" x-cloak>
@@ -1775,6 +1778,28 @@
                   </div>
                 </div>
                 <div class="mb-3">
+                  <label class="form-label" for="displayRatio">
+                    Public Display Ratio
+                    <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="Lock the public winner display to a fixed screen shape (letterboxed with dark bars). Pick a Portrait ratio for vertical screens."></i>
+                  </label>
+                  <select class="form-select" id="displayRatio"
+                          x-model="$store.settings.displayRatio"
+                          @change="Settings.applyDisplayRatio($store.settings.displayRatio); $store.settings.save('displayRatio')">
+                    <option value="fit">Fit to Screen (Default)</option>
+                    <optgroup label="Landscape">
+                      <option value="16:9">16 : 9 — Widescreen</option>
+                      <option value="16:10">16 : 10</option>
+                      <option value="4:3">4 : 3 — Standard</option>
+                      <option value="21:9">21 : 9 — Ultrawide</option>
+                    </optgroup>
+                    <optgroup label="Portrait">
+                      <option value="9:16">9 : 16 — Vertical</option>
+                      <option value="3:4">3 : 4</option>
+                      <option value="10:12">10 : 12 — Portrait Screen</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div class="mb-3">
                   <label class="form-label">
                     Background Type
                     <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="Choose background style for winner display"></i>
@@ -2346,6 +2371,9 @@
         selectionColor: Alpine.$persist('#10b981').as('settings_selectionColor'),
         backgroundType: Alpine.$persist('gradient').as('settings_backgroundType'),
         customBackgroundImage: Alpine.$persist(null).as('settings_customBackgroundImage'),
+
+        // Public display settings
+        displayRatio: Alpine.$persist('fit').as('settings_displayRatio'),
 
         // Selection display settings
         selectionMode: Alpine.$persist('all-at-once').as('settings_selectionMode'),

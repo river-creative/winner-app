@@ -24,6 +24,7 @@ html {
   --gradient-bg: linear-gradient(135deg, #456aa1 0%, #5c9af6 100%);
   --glass-bg: rgba(255, 255, 255, 0.1);
   --glass-border: rgba(255, 255, 255, 0.2);
+  --display-backdrop: #0a0a0f; /* letterbox bars around a fixed-ratio public display */
 }
 
 /* Fix for Bootstrap tab visibility - use display instead of opacity */
@@ -256,17 +257,39 @@ body {
   justify-content: center;
 }
 
-/* Main Public Selection Interface */
+/* Main Public Selection Interface — the backdrop that fills the viewport and centers the
+   display stage. In fixed-ratio mode its margins show as dark letterbox bars. */
 .public-selection-interface {
   min-height: 100vh;
   height: 100vh;
   /* Fixed height for no scrolling */
+  background: var(--display-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  /* Only prevent scrolling in selection interface */
+}
+
+/* Display stage — the actual winner "screen" holding the header + selection area.
+   Defaults to filling the backdrop (fit-to-screen); a fixed ratio letterboxes it (below).
+   The stage carries the themed background; the backdrop stays dark. */
+.display-stage {
+  width: 100%;
+  height: 100%;
   background: var(--gradient-bg);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  /* Only prevent scrolling in selection interface */
+}
+
+/* Fixed public display ratio: size the stage to the chosen aspect ratio, fitted inside the
+   viewport in either orientation. --display-ar (= width / height) is set by applyDisplayRatio(). */
+[data-display-ratio="fixed"] .display-stage {
+  width: min(100vw, calc(100vh * var(--display-ar)));
+  height: min(100vh, calc(100vw / var(--display-ar)));
 }
 
 .selection-header {
@@ -524,6 +547,63 @@ body {
   grid-template-columns: repeat(12, 1fr);
   grid-template-rows: repeat(auto-fill, minmax(70px, 90px));
   grid-auto-rows: minmax(70px, 90px);
+}
+
+/* ============================================================
+   PORTRAIT public display — reflow the winners grid to favour rows over
+   columns so it fills a vertical (portrait) screen. Activated when a portrait
+   ratio is chosen (applyDisplayRatio sets <html data-display-orientation="portrait">).
+   Each rule mirrors a landscape bracket selector, so its specificity is one higher
+   and it wins without !important. Only brackets whose layout differs are overridden;
+   3-4 (2x2) and 7-9 (3x3) are already square and inherit the base rules.
+   ============================================================ */
+
+/* 2 winners — stack vertically (1 col x 2 rows) */
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) {
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(2, minmax(180px, 32vh));
+  max-height: 70vh;
+}
+
+/* 5-6 winners — 2 cols x 3 rows */
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(5):nth-last-child(1)),
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(6):nth-last-child(1)) {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(3, minmax(140px, 26vh));
+  max-height: 82vh;
+}
+
+/* 10-12 winners — 3 cols x 4 rows */
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(10):nth-last-child(1)),
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(11):nth-last-child(1)),
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)) {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, minmax(110px, 21vh));
+  max-height: 90vh;
+}
+
+/* 13-25 winners — 4 cols (landscape: 5) */
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)) {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* 26-49 winners — 5 cols (landscape: 7) */
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)) {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+/* 50-99 winners — 7 cols (landscape: 10) */
+[data-display-orientation="portrait"] .winners-grid:has(.winner-card:nth-child(n+50):nth-child(-n+99)) {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+/* 100+ winners — 10 cols (landscape: 12), matching the 10:12 portrait screen.
+   The 50-99 selector above also matches at 100+ cards and its two-bound :has() argument
+   would otherwise out-specify this one. The extra [data-display-ratio="fixed"] qualifier
+   (always co-present in portrait mode) ties the specificity so this later rule wins — no
+   !important needed. */
+[data-display-orientation="portrait"][data-display-ratio="fixed"] .winners-grid:has(.winner-card:nth-child(n+100)) {
+  grid-template-columns: repeat(10, 1fr);
 }
 
 .winner-card {

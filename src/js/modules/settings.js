@@ -35,7 +35,23 @@ let settings = {
   soundDuringReveal: 'none',
   celebrationEffect: 'confetti',
   celebrationDuration: 4,
-  celebrationAutoTrigger: true
+  celebrationAutoTrigger: true,
+
+  // Public display settings
+  displayRatio: 'fit' // 'fit' = fill screen (default); otherwise a fixed aspect ratio (see DISPLAY_RATIOS)
+};
+
+// Public display aspect ratios (width/height). null = "fit to screen" (no letterbox).
+// Portrait presets (decimal < 1) flip the winners grid to a portrait-optimised layout.
+const DISPLAY_RATIOS = {
+  'fit': null,
+  '16:9': 16 / 9,
+  '16:10': 16 / 10,
+  '4:3': 4 / 3,
+  '21:9': 21 / 9,
+  '9:16': 9 / 16,
+  '3:4': 3 / 4,
+  '10:12': 10 / 12
 };
 
 async function saveSettings() {
@@ -207,6 +223,7 @@ async function handleSaveSettings() {
 
 function setupTheme() {
   applyTheme();
+  applyDisplayRatio();
   loadSettingsToForm();
   setupSoundTestButtons();
   setupBackgroundTypeHandler();
@@ -262,27 +279,53 @@ function applyTheme() {
   root.style.setProperty('--gradient-bg', gradient);
   document.body.style.fontFamily = `'${settings.fontFamily}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
   
-  // Apply background to PUBLIC interface only
-  const publicInterface = document.getElementById('publicInterface');
-  if (publicInterface) {
+  // Apply background to the display stage only (the letterboxed "screen").
+  // #publicInterface is the surrounding backdrop and stays dark in fixed-ratio mode.
+  const displayStage = document.getElementById('displayStage');
+  if (displayStage) {
     if (settings.backgroundType === 'gradient') {
-      publicInterface.style.background = gradient;
+      displayStage.style.background = gradient;
     } else if (settings.backgroundType === 'solid') {
-      publicInterface.style.background = settings.primaryColor;
+      displayStage.style.background = settings.primaryColor;
     } else if (settings.backgroundType === 'image' && settings.customBackgroundImage) {
-      publicInterface.style.backgroundImage = `url('${settings.customBackgroundImage}')`;
-      publicInterface.style.backgroundSize = 'cover';
-      publicInterface.style.backgroundPosition = 'center';
-      publicInterface.style.backgroundAttachment = 'fixed';
+      displayStage.style.backgroundImage = `url('${settings.customBackgroundImage}')`;
+      displayStage.style.backgroundSize = 'cover';
+      displayStage.style.backgroundPosition = 'center';
+      displayStage.style.backgroundAttachment = 'fixed';
     } else {
       // Default to gradient if no custom image is set
-      publicInterface.style.background = gradient;
+      displayStage.style.background = gradient;
     }
   }
   
   // Keep body background clean for management interface
   document.body.style.background = '';
   document.body.style.fontFamily = `'${settings.fontFamily}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+}
+
+// Apply the chosen public display ratio by driving CSS via <html> attributes + a custom property.
+// The CSS (styles.css) does the actual letterboxing and portrait grid reflow. Fail-soft on a bad
+// value: a cosmetic setting must never break the live presentation, but we surface it via warn.
+function applyDisplayRatio(ratio = settings.displayRatio) {
+  const root = document.documentElement;
+  let decimal = DISPLAY_RATIOS[ratio];
+
+  if (decimal === undefined) {
+    console.warn(`Unknown display ratio "${ratio}" — falling back to fit-to-screen.`);
+    decimal = null;
+  }
+
+  if (!decimal) {
+    // Fit to screen: stage fills the viewport, no letterbox (default / original behaviour).
+    root.setAttribute('data-display-ratio', 'fit');
+    root.style.removeProperty('--display-ar');
+    root.removeAttribute('data-display-orientation');
+    return;
+  }
+
+  root.setAttribute('data-display-ratio', 'fixed');
+  root.style.setProperty('--display-ar', decimal);
+  root.setAttribute('data-display-orientation', decimal < 1 ? 'portrait' : 'landscape');
 }
 
 function loadSettingsToForm() {
@@ -297,6 +340,7 @@ function loadSettingsToForm() {
     'primaryColor': settings.primaryColor,
     'secondaryColor': settings.secondaryColor,
     'backgroundType': settings.backgroundType,
+    'displayRatio': settings.displayRatio,
     'enableWebhook': settings.enableWebhook,
     'webhookUrl': settings.webhookUrl
   };
@@ -1244,6 +1288,7 @@ export const Settings = {
   handleSaveSettings,
   setupTheme,
   applyTheme,
+  applyDisplayRatio,
   loadSettingsToForm,
   loadSoundSettingsToForm,
   toggleTheme,
