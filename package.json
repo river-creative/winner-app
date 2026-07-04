@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite --host",
     "dev:server": "nodemon --exec tsx backend/server.ts",
-    "dev:all": "npm run dev:server & npm run dev",
+    "dev:all": "concurrently -k -n server,web -c blue,green \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build && tsc -p tsconfig.backend.json",
     "build:frontend": "vite build",
     "build:backend": "tsc -p tsconfig.backend.json",
@@ -38,6 +38,7 @@
     "@types/node": "^20.19.11",
     "@types/node-cron": "^3.0.11",
     "@types/uuid": "^10.0.0",
+    "concurrently": "^10.0.3",
     "nodemon": "^3.1.10",
     "puppeteer": "^24.17.0",
     "ts-node": "^10.9.2",
