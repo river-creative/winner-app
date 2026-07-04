@@ -204,18 +204,30 @@
           body: JSON.stringify({ username, password })
         });
 
-        const data = await response.json();
-
         if (response.ok) {
           // Redirect to the originally requested page or home
           const redirect = new URLSearchParams(window.location.search).get('redirect') || '/';
           window.location.href = redirect;
-        } else {
-          errorText.textContent = data.error || 'Invalid credentials';
-          errorMessage.classList.add('show');
+          return;
         }
+
+        // Server responded with an error. Prefer its JSON message, but fall back
+        // gracefully if the body isn't JSON (e.g. a dev-proxy 500 or nginx 502),
+        // which signals the server is unreachable rather than an app-level error.
+        let message;
+        try {
+          const data = await response.json();
+          message = data?.error || `Sign in failed (${response.status}).`;
+        } catch {
+          message = response.status >= 500
+            ? 'Cannot reach the server. Please try again shortly.'
+            : `Sign in failed (${response.status}). Please try again.`;
+        }
+        errorText.textContent = message;
+        errorMessage.classList.add('show');
       } catch (error) {
-        errorText.textContent = 'Connection error. Please try again.';
+        // fetch threw = server completely unreachable (backend down / network error).
+        errorText.textContent = 'Cannot reach the server. Please check your connection and try again.';
         errorMessage.classList.add('show');
       } finally {
         loginBtn.disabled = false;

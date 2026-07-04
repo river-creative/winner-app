@@ -56,9 +56,30 @@ function sessionAuthPlugin() {
             return next();
           }
         } catch (e) {
-          // Backend not available, allow through (dev convenience)
-          console.warn('Could not verify session with backend:', e.message);
-          return next();
+          // Fail-fast: the backend at :3001 is unreachable, so every API call this
+          // page makes would be refused (ECONNREFUSED). Rather than silently serving
+          // a broken shell, tell the developer exactly what's wrong and how to fix it.
+          console.error(`\n[dev] Backend unreachable at http://localhost:3001 — is it running? (${e.message})\n      Start it with:  pnpm dev:server   (or run both with:  pnpm dev:all)\n`);
+          res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' });
+          res.end(`<!doctype html>
+<meta charset="utf-8">
+<title>Backend not running</title>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;background:#0A4f7B;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:1rem}
+  .card{background:#fff;color:#1f2937;max-width:520px;padding:2rem 2.25rem;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  h1{margin:0 0 .75rem;font-size:1.25rem}
+  p{margin:.5rem 0;line-height:1.55}
+  code{background:#f3f4f6;padding:.15rem .4rem;border-radius:6px;font-size:.9em}
+  .hint{color:#6b7280;font-size:.85rem;margin-top:1.25rem}
+</style>
+<div class="card">
+  <h1>⚠️ Backend server not running</h1>
+  <p>The Vite dev server proxies <code>/api</code> to <code>http://localhost:3001</code>, but nothing is listening there.</p>
+  <p>Start the backend, then reload this page:</p>
+  <p><code>pnpm dev:server</code> &nbsp;—&nbsp; or run both together with <code>pnpm dev:all</code></p>
+  <p class="hint">Shown by the Vite dev auth plugin — this only runs in local development, never in production.</p>
+</div>`);
+          return;
         }
 
         // Session invalid, redirect to login
