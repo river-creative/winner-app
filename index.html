@@ -2365,9 +2365,6 @@
         celebrationDuration: Alpine.$persist(4).as('settings_celebrationDuration'),
         celebrationAutoTrigger: Alpine.$persist(true).as('settings_celebrationAutoTrigger'),
 
-        // SMS Template
-        smsTemplate: Alpine.$persist('Congratulations {name}! You won {prize}. Your code: {contactId}').as('settings_smsTemplate'),
-
         init() {
           // Sync with backend on load (non-blocking)
           this.loadFromServer();

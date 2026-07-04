@@ -33,7 +33,6 @@ let settings = {
   soundDuringDelay: 'none',
   soundEndOfDelay: 'none',
   soundDuringReveal: 'none',
-  smsTemplate: 'Congratulations {name}! You won {prize}. Your code: {contactId}',
   celebrationEffect: 'confetti',
   celebrationDuration: 4,
   celebrationAutoTrigger: true
@@ -370,52 +369,6 @@ function loadSettingsToForm() {
   }
 
   // Load SMS template
-}
-
-// Update SMS character count and SMS count display
-function updateSMSCharCount() {
-  const smsTemplate = document.getElementById('smsTemplate');
-  const smsCharCount = document.getElementById('smsCharCount');
-  
-  if (smsTemplate && smsCharCount) {
-    const text = smsTemplate.value;
-    const charCount = text.length;
-    
-    // Calculate SMS count (standard SMS is 160 chars, multipart starts at 153 chars per segment)
-    let smsCount;
-    if (charCount === 0) {
-      smsCount = 1;
-    } else if (charCount <= 160) {
-      smsCount = 1;
-    } else {
-      // Multipart SMS: first segment 153 chars, subsequent segments 153 chars
-      smsCount = Math.ceil(charCount / 153);
-    }
-    
-    smsCharCount.textContent = `${charCount} characters, ${smsCount} SMS${smsCount > 1 ? ' messages' : ''}`;
-    
-    // Color coding based on SMS count
-    if (smsCount >= 3) {
-      smsCharCount.style.color = '#dc3545'; // red for 3+ SMS
-    } else if (smsCount === 2) {
-      smsCharCount.style.color = '#fd7e14'; // orange for 2 SMS
-    } else {
-      smsCharCount.style.color = '#6c757d'; // muted gray for 1 SMS
-    }
-  }
-}
-
-// Setup SMS template character counter
-function setupSMSTemplateCounter() {
-  const smsTemplate = document.getElementById('smsTemplate');
-  if (smsTemplate) {
-    // Add character count update and auto-save
-    smsTemplate.addEventListener('input', () => {
-      updateSMSCharCount();
-      autoSaveIndividualSetting('smsTemplate');
-    });
-    updateSMSCharCount(); // Initial count
-  }
 }
 
 function toggleTheme() {
@@ -916,8 +869,7 @@ async function autoSaveIndividualSetting(fieldId) {
       'selectionColor': 'selectionColor',
       'backgroundType': 'backgroundType',
       'enableWebhook': 'enableWebhook',
-      'webhookUrl': 'webhookUrl',
-      'smsTemplate': 'smsTemplate'
+      'webhookUrl': 'webhookUrl'
     };
 
     const settingKey = fieldToSettingMap[fieldId];
@@ -1236,8 +1188,7 @@ function setupAllSettingsAutoSave() {
     'secondaryColor',
     'backgroundType',
     'enableWebhook',
-    'webhookUrl',
-    'smsTemplate'
+    'webhookUrl'
   ];
 
   allSettingsFields.forEach(fieldId => {
@@ -1310,7 +1261,6 @@ export const Settings = {
   autoSaveAllSettings,
   setupQuickSetupAutoSave,
   setupAllSettingsAutoSave,
-  setupSMSTemplateCounter,
   updateSettings: function(newSettings) { Object.assign(settings, newSettings); },
   debugLog,
   cleanupEventListeners, // Add cleanup function to exports

@@ -361,9 +361,6 @@ function setupManagementListeners() {
   // Setup webhook toggle functionality
   Settings.setupWebhookToggle();
 
-  // Setup SMS template character counter
-  Settings.setupSMSTemplateCounter();
-
   // Setup auto-save for quick setup fields
   Settings.setupQuickSetupAutoSave();
 
