@@ -612,9 +612,11 @@ body {
      below reproduce the original look exactly (scale 1, original padding). */
   --winner-card-pad: clamp(0.5rem, 2vw, 1.0rem);
   --winner-name-scale: 1;
-  /* Mirrors .winner-number width/height (well-formed clamp → identical value). Used to
-     reserve top clearance so the top info line never slides under the number badge. */
+  /* Number-badge geometry — single source of truth, consumed by .winner-number (width/height +
+     top/left) and by the top-clearance calc in the display-size presets. The offset is a
+     positive magnitude (~half the size) so the badge straddles the card corner at every size. */
   --winner-badge-size: clamp(16px, 4cqw, 35px);
+  --winner-badge-offset: clamp(8px, 2cqw, 17px);
 
   background: rgba(255, 255, 255, 0.95);
   border-radius: clamp(8px, 2vw, 15px);
@@ -785,10 +787,10 @@ body {
   align-items: center;
   justify-content: center;
 
-  /* Position outside the card */
+  /* Position outside the card (offset ~= half the badge size so it straddles the corner) */
   position: absolute;
-  top: clamp(-8px, -2cqw, -17px);
-  left: clamp(-8px, -2cqw, -17px);
+  top: calc(-1 * var(--winner-badge-offset));
+  left: calc(-1 * var(--winner-badge-offset));
   z-index: 10;
 
   /* Enhanced styling */
@@ -801,8 +803,8 @@ body {
   width: clamp(60px, 10vw, 100px);
   height: clamp(60px, 10vw, 100px);
   font-size: clamp(2rem, 6vw, 3.5rem);
-  top: clamp(-30px, -5vw, -50px);
-  left: clamp(-30px, -5vw, -50px);
+  top: clamp(-50px, -5vw, -30px);
+  left: clamp(-50px, -5vw, -30px);
 }
 
 .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) .winner-number,
@@ -811,8 +813,8 @@ body {
   width: clamp(50px, 8vw, 80px);
   height: clamp(50px, 8vw, 80px);
   font-size: clamp(1.5rem, 4vw, 2.5rem);
-  top: clamp(-25px, -4vw, -40px);
-  left: clamp(-25px, -4vw, -40px);
+  top: clamp(-40px, -4vw, -25px);
+  left: clamp(-40px, -4vw, -25px);
 }
 
 .winner-info1 {
@@ -912,17 +914,17 @@ body {
    Winner Display Size presets — driven by the "Winner Display Size" setting
    (settings.js applyDisplayFontSize sets <html data-display-font-size>). Each level shrinks
    the card padding (so the winner name fills more of the card) and scales the name up via
-   --winner-name-scale. A dedicated TOP clearance — the badge size minus its minimum outward
-   offset (8px; the badge's top/left never protrude less than this) plus a small gap — is
-   reserved so the top info line can never slide under the number badge, no matter how small
-   the padding gets. "default" is intentionally not listed, so it keeps the original look.
+   --winner-name-scale. A dedicated TOP clearance — the badge size minus its outward offset (how
+   far the badge reaches into the card) plus a small gap — is reserved so the top info line can
+   never slide under the number badge, no matter how small the padding gets. "default" is
+   intentionally not listed, so it keeps the original look.
    Larger levels are best for smaller winner counts; long names may wrap to two lines.
    ============================================================ */
 [data-display-font-size="large"] .winner-card,
 [data-display-font-size="xlarge"] .winner-card,
 [data-display-font-size="max"] .winner-card {
   padding:
-    max(var(--winner-card-pad), calc(var(--winner-badge-size) - 8px + 0.2rem))
+    max(var(--winner-card-pad), calc(var(--winner-badge-size) - var(--winner-badge-offset) + 0.2rem))
     var(--winner-card-pad)
     var(--winner-card-pad);
 }
