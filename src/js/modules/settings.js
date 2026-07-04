@@ -38,7 +38,8 @@ let settings = {
   celebrationAutoTrigger: true,
 
   // Public display settings
-  displayRatio: 'fit' // 'fit' = fill screen (default); otherwise a fixed aspect ratio (see DISPLAY_RATIOS)
+  displayRatio: 'fit', // 'fit' = fill screen (default); otherwise a fixed aspect ratio (see DISPLAY_RATIOS)
+  displayFontSize: 'default' // 'default' keeps the original card look; 'large'|'xlarge'|'max' shrink card padding + enlarge the winner name (see applyDisplayFontSize + styles.css "Winner Display Size presets")
 };
 
 // Public display aspect ratios (width/height). null = "fit to screen" (no letterbox).
@@ -224,6 +225,7 @@ async function handleSaveSettings() {
 function setupTheme() {
   applyTheme();
   applyDisplayRatio();
+  applyDisplayFontSize();
   loadSettingsToForm();
   setupSoundTestButtons();
   setupBackgroundTypeHandler();
@@ -328,6 +330,25 @@ function applyDisplayRatio(ratio = settings.displayRatio) {
   root.setAttribute('data-display-orientation', decimal < 1 ? 'portrait' : 'landscape');
 }
 
+// Valid winner display font sizes. Each level maps to a [data-display-font-size] CSS bracket in
+// styles.css ("Winner Display Size presets") that shrinks the card padding and scales the name up.
+const DISPLAY_FONT_SIZES = ['default', 'large', 'xlarge', 'max'];
+
+// Apply the chosen winner display font size by tagging <html> with data-display-font-size. The CSS
+// does the actual padding/name scaling. Fail-soft on a bad value (mirrors applyDisplayRatio): a
+// cosmetic setting must never break the live presentation, but we surface the problem via warn.
+function applyDisplayFontSize(size = settings.displayFontSize) {
+  const root = document.documentElement;
+  let value = size;
+
+  if (!DISPLAY_FONT_SIZES.includes(value)) {
+    console.warn(`Unknown display font size "${size}" — falling back to default.`);
+    value = 'default';
+  }
+
+  root.setAttribute('data-display-font-size', value);
+}
+
 function loadSettingsToForm() {
 
   const settingsFields = {
@@ -341,6 +362,7 @@ function loadSettingsToForm() {
     'secondaryColor': settings.secondaryColor,
     'backgroundType': settings.backgroundType,
     'displayRatio': settings.displayRatio,
+    'displayFontSize': settings.displayFontSize,
     'enableWebhook': settings.enableWebhook,
     'webhookUrl': settings.webhookUrl
   };
@@ -1289,6 +1311,7 @@ export const Settings = {
   setupTheme,
   applyTheme,
   applyDisplayRatio,
+  applyDisplayFontSize,
   loadSettingsToForm,
   loadSoundSettingsToForm,
   toggleTheme,

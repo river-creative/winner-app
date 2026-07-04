@@ -607,9 +607,18 @@ body {
 }
 
 .winner-card {
+  /* Winner Display Size tokens — overridden per <html data-display-font-size> (see the
+     "Winner Display Size presets" section + settings.js applyDisplayFontSize). The defaults
+     below reproduce the original look exactly (scale 1, original padding). */
+  --winner-card-pad: clamp(0.5rem, 2vw, 1.0rem);
+  --winner-name-scale: 1;
+  /* Mirrors .winner-number width/height (well-formed clamp → identical value). Used to
+     reserve top clearance so the top info line never slides under the number badge. */
+  --winner-badge-size: clamp(16px, 4cqw, 35px);
+
   background: rgba(255, 255, 255, 0.95);
   border-radius: clamp(8px, 2vw, 15px);
-  padding: clamp(0.5rem, 2vw, 1.0rem);
+  padding: var(--winner-card-pad);
   /* Strong shadow by default */
   box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25),
     0 5px 15px rgba(0, 0, 0, 0.15);
@@ -765,8 +774,8 @@ body {
 }
 
 .winner-number {
-  width: clamp(16px, 4cqw, 35px);
-  height: clamp(16px, 4cqw, 35px);
+  width: var(--winner-badge-size);
+  height: var(--winner-badge-size);
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   color: white;
@@ -818,7 +827,7 @@ body {
 }
 
 .winner-info2 {
-  font-size: clamp(1.2rem, 7.5cqw, 2.5rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(1.2rem, 7.5cqw, 2.5rem));
   font-weight: 700;
   color: #333;
   margin-bottom: clamp(0.08rem, 0.7cqw, 0.25rem);
@@ -842,7 +851,7 @@ body {
 }
 
 .winners-grid:has(.winner-card:nth-child(1):nth-last-child(1)) .winner-info2 {
-  font-size: clamp(2.2rem, 13cqw, 4.5rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(2.2rem, 13cqw, 4.5rem));
 }
 
 .winners-grid:has(.winner-card:nth-child(1):nth-last-child(1)) .winner-info3 {
@@ -858,7 +867,7 @@ body {
 .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) .winner-info2,
 .winners-grid:has(.winner-card:nth-child(3):nth-last-child(1)) .winner-info2,
 .winners-grid:has(.winner-card:nth-child(4):nth-last-child(1)) .winner-info2 {
-  font-size: clamp(1.6rem, 9cqw, 2.8rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(1.6rem, 9cqw, 2.8rem));
 }
 
 .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) .winner-info3,
@@ -876,27 +885,61 @@ body {
 .winners-grid:has(.winner-card:nth-child(10):nth-last-child(1)) .winner-info2,
 .winners-grid:has(.winner-card:nth-child(11):nth-last-child(1)) .winner-info2,
 .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)) .winner-info2 {
-  font-size: clamp(1.2rem, 7cqw, 2rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(1.2rem, 7cqw, 2rem));
 }
 
 /* 13-25 winners */
 .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)) .winner-info2 {
-  font-size: clamp(1rem, 6cqw, 1.7rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(1rem, 6cqw, 1.7rem));
 }
 
 /* 26-49 winners */
 .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)) .winner-info2 {
-  font-size: clamp(0.9rem, 5cqw, 1.4rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(0.9rem, 5cqw, 1.4rem));
 }
 
 /* 50-99 winners */
 .winners-grid:has(.winner-card:nth-child(n+50):nth-child(-n+99)) .winner-info2 {
-  font-size: clamp(0.8rem, 4.5cqw, 1.2rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(0.8rem, 4.5cqw, 1.2rem));
 }
 
 /* 100+ winners */
 .winners-grid:has(.winner-card:nth-child(n+100)) .winner-info2 {
-  font-size: clamp(0.7rem, 3.5cqw, 1rem);
+  font-size: calc(var(--winner-name-scale, 1) * clamp(0.7rem, 3.5cqw, 1rem));
+}
+
+/* ============================================================
+   Winner Display Size presets — driven by the "Winner Display Size" setting
+   (settings.js applyDisplayFontSize sets <html data-display-font-size>). Each level shrinks
+   the card padding (so the winner name fills more of the card) and scales the name up via
+   --winner-name-scale. A dedicated TOP clearance — the badge size minus its minimum outward
+   offset (8px; the badge's top/left never protrude less than this) plus a small gap — is
+   reserved so the top info line can never slide under the number badge, no matter how small
+   the padding gets. "default" is intentionally not listed, so it keeps the original look.
+   Larger levels are best for smaller winner counts; long names may wrap to two lines.
+   ============================================================ */
+[data-display-font-size="large"] .winner-card,
+[data-display-font-size="xlarge"] .winner-card,
+[data-display-font-size="max"] .winner-card {
+  padding:
+    max(var(--winner-card-pad), calc(var(--winner-badge-size) - 8px + 0.2rem))
+    var(--winner-card-pad)
+    var(--winner-card-pad);
+}
+
+[data-display-font-size="large"] .winner-card {
+  --winner-card-pad: clamp(0.4rem, 1.2vw, 0.7rem);
+  --winner-name-scale: 1.3;
+}
+
+[data-display-font-size="xlarge"] .winner-card {
+  --winner-card-pad: clamp(0.3rem, 0.9vw, 0.55rem);
+  --winner-name-scale: 1.6;
+}
+
+[data-display-font-size="max"] .winner-card {
+  --winner-card-pad: clamp(0.25rem, 0.6vw, 0.45rem);
+  --winner-name-scale: 2;
 }
 
 /* Prize Display */
@@ -1364,7 +1407,7 @@ body {
 
 @container (max-width: 280px) {
   .winner-info2 {
-    font-size: clamp(0.7rem, 10cqw, 1rem);
+    font-size: calc(var(--winner-name-scale, 1) * clamp(0.7rem, 10cqw, 1rem));
     /* Keep visible but smaller on very small cards */
   }
 

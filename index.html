@@ -1800,6 +1800,20 @@
                   </select>
                 </div>
                 <div class="mb-3">
+                  <label class="form-label" for="displayFontSize">
+                    Winner Display Size
+                    <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="How large the winner name is shown on the public display. Larger sizes reduce the card padding and enlarge the name; long names may wrap to two lines. Larger sizes suit smaller winner counts."></i>
+                  </label>
+                  <select class="form-select" id="displayFontSize"
+                          x-model="$store.settings.displayFontSize"
+                          @change="Settings.applyDisplayFontSize($store.settings.displayFontSize); $store.settings.save('displayFontSize')">
+                    <option value="default">Default</option>
+                    <option value="large">Large</option>
+                    <option value="xlarge">Extra Large</option>
+                    <option value="max">Maximum</option>
+                  </select>
+                </div>
+                <div class="mb-3">
                   <label class="form-label">
                     Background Type
                     <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="Choose background style for winner display"></i>
@@ -2374,6 +2388,7 @@
 
         // Public display settings
         displayRatio: Alpine.$persist('fit').as('settings_displayRatio'),
+        displayFontSize: Alpine.$persist('default').as('settings_displayFontSize'),
 
         // Selection display settings
         selectionMode: Alpine.$persist('all-at-once').as('settings_selectionMode'),
