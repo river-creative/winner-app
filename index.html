@@ -1778,42 +1778,6 @@
                   </div>
                 </div>
                 <div class="mb-3">
-                  <label class="form-label" for="displayRatio">
-                    Public Display Ratio
-                    <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="Lock the public winner display to a fixed screen shape (letterboxed with dark bars). Pick a Portrait ratio for vertical screens."></i>
-                  </label>
-                  <select class="form-select" id="displayRatio"
-                          x-model="$store.settings.displayRatio"
-                          @change="Settings.applyDisplayRatio($store.settings.displayRatio); $store.settings.save('displayRatio')">
-                    <option value="fit">Fit to Screen (Default)</option>
-                    <optgroup label="Landscape">
-                      <option value="16:9">16 : 9 — Widescreen</option>
-                      <option value="16:10">16 : 10</option>
-                      <option value="4:3">4 : 3 — Standard</option>
-                      <option value="21:9">21 : 9 — Ultrawide</option>
-                    </optgroup>
-                    <optgroup label="Portrait">
-                      <option value="9:16">9 : 16 — Vertical</option>
-                      <option value="3:4">3 : 4</option>
-                      <option value="10:12">10 : 12 — Portrait Screen</option>
-                    </optgroup>
-                  </select>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label" for="displayFontSize">
-                    Winner Display Size
-                    <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="How large the winner name is shown on the public display. Larger sizes reduce the card padding and enlarge the name; long names may wrap to two lines. Larger sizes suit smaller winner counts."></i>
-                  </label>
-                  <select class="form-select" id="displayFontSize"
-                          x-model="$store.settings.displayFontSize"
-                          @change="Settings.applyDisplayFontSize($store.settings.displayFontSize); $store.settings.save('displayFontSize')">
-                    <option value="default">Default</option>
-                    <option value="large">Large</option>
-                    <option value="xlarge">Extra Large</option>
-                    <option value="max">Maximum</option>
-                  </select>
-                </div>
-                <div class="mb-3">
                   <label class="form-label">
                     Background Type
                     <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="Choose background style for winner display"></i>
@@ -1887,6 +1851,48 @@
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+            <!-- Display Settings (public winner display) -->
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title">Display</h5>
+                <div class="mb-3">
+                  <label class="form-label" for="displayRatio">
+                    Public Display Ratio
+                    <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="Lock the public winner display to a fixed screen shape (letterboxed with dark bars). Pick a Portrait ratio for vertical screens."></i>
+                  </label>
+                  <select class="form-select" id="displayRatio"
+                          x-model="$store.settings.displayRatio"
+                          @change="Settings.applyDisplayRatio($store.settings.displayRatio); $store.settings.save('displayRatio')">
+                    <option value="fit">Fit to Screen (Default)</option>
+                    <optgroup label="Landscape">
+                      <option value="16:9">16 : 9 — Widescreen</option>
+                      <option value="16:10">16 : 10</option>
+                      <option value="4:3">4 : 3 — Standard</option>
+                      <option value="21:9">21 : 9 — Ultrawide</option>
+                    </optgroup>
+                    <optgroup label="Portrait">
+                      <option value="9:16">9 : 16 — Vertical</option>
+                      <option value="3:4">3 : 4</option>
+                      <option value="10:12">10 : 12 — Portrait Screen</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label" for="displayFontSize">
+                    Winner Display Size
+                    <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="How large the winner name is shown on the public display. Larger sizes reduce the card padding and enlarge the name; long names may wrap to two lines. Larger sizes suit smaller winner counts."></i>
+                  </label>
+                  <select class="form-select" id="displayFontSize"
+                          x-model="$store.settings.displayFontSize"
+                          @change="Settings.applyDisplayFontSize($store.settings.displayFontSize); $store.settings.save('displayFontSize')">
+                    <option value="default">Default</option>
+                    <option value="large">Large</option>
+                    <option value="xlarge">Extra Large</option>
+                    <option value="max">Maximum</option>
+                  </select>
                 </div>
               </div>
             </div>
