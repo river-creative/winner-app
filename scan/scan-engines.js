@@ -59,6 +59,13 @@ class CameraController {
     this.stream = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS, audio: false });
     videoElement.srcObject = this.stream;
     videoElement.setAttribute('playsinline', 'true'); // required for inline playback on iOS
+
+    // scan-app.js starts the scanner 500 ms after load, so on a direct hit to scan.html there
+    // is no user gesture. Chrome's autoplay policy rejects play() on an unmuted element
+    // without one — even for a stream that carries no audio track at all. We request
+    // audio: false, so muting changes nothing except removing that dependency.
+    videoElement.muted = true;
+
     await videoElement.play();
 
     // Best-effort continuous autofocus for sharper frames in poor light. Support varies
@@ -103,6 +110,15 @@ class FrameLoopEngine {
     this.onFatal = onFatal;
     this.running = true;
     await this.camera.open(videoElement);
+
+    // stop() may have run while getUserMedia was in flight. It could not release a stream
+    // that did not exist yet, so release it here — otherwise the camera stays live with
+    // nothing referencing it, and the indicator light never goes out.
+    if (!this.running) {
+      this.camera.close(videoElement);
+      return;
+    }
+
     this.scheduleNext(0);
   }
 
@@ -231,6 +247,56 @@ class JsEngine {
 
 // --- Capability detection + factory -----------------------------------------
 
+// A 116x116 PNG of a QR encoding SELF_TEST_VALUE, decode-verified against two independent
+// decoders (jsQR and this very zxing-wasm build) before being inlined here.
+//
+// Why it exists: on iOS 18+ (WebKit bug 281848, still open) and on Chrome/macOS Ventura
+// before 113, BarcodeDetector exists, reports qr_code support, and then *silently returns
+// empty results forever* rather than throwing. isFatalError() below only catches detectors
+// that throw, so such a device would select the native tier, bring the camera up, look
+// perfectly healthy — and never scan anything. Decoding a code we know is there is the only
+// way to tell a working detector from a blind one.
+const SELF_TEST_VALUE = 'RMI-SCAN-OK';
+const SELF_TEST_QR_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHQAAAB0CAYAAABUmhYnAAAAAklEQVR4AewaftIAAAKrSURBVO3BQW7gSAwEwSxC//9yro88NSBI8o4JRsQfrDGKNUqxRinWKMUapVijFGuUYo1SrFGKNUqxRinWKMUapVijFGuUYo1y8VASfpNKl4QnVE6S8JtUnijWKMUapVijXLxM5U1J+FISOpUTlTcl4U3FGqVYoxRrlIuPJeEOlTepfCkJd6h8qVijFGuUYo1y8cepdEnoktCpTFasUYo1SrFGufjjkvBEEjqVv6xYoxRrlGKNcvExlS+p3JGEN6n8S4o1SrFGKdYoFy9Lwm9KQqfSJaFT6ZJwRxL+ZcUapVijFGuU+INBktCpdEk4UfnLijVKsUYp1igXDyWhUzlJwpdUuiR0Kl0SuiR0KidJ6FS6JNyh8kSxRinWKMUa5eJlSehUOpUuCScqdyThCZUuCXck4f9UrFGKNUqxRrn4WBI6lU7lJAlPqJyo3KFykoROpUvCl4o1SrFGKdYoFw+p3JGETqVLQqfSJaFT6ZJwkoRO5USlS8KbVN5UrFGKNUqxRrl4KAmdyh1J6FS6JDyRhE7lJAknKidJOFH5UrFGKdYoxRol/uAPS8KbVJ5IwhMqTxRrlGKNUqxRLh5Kwm9SOVHpktCpdEnoknCi0iXhROUkCW8q1ijFGqVYo1y8TOVNSbgjCSdJuEOlS0KncpKE31SsUYo1SrFGufhYEu5QeULlJAknKl0SOpUuCZ1Kp9Il4UvFGqVYoxRrlIvhkvCEyptUvlSsUYo1SrFGufjjVE5UnkhCp9KpdEnoVLoknKg8UaxRijVKsUa5+JjKb0rCicpJEu5IQqfSJeFE5U3FGqVYoxRrlIuXJeE3JeGOJHQqncodKv+SYo1SrFGKNUr8wRqjWKMUa5RijVKsUYo1SrFGKdYoxRqlWKMUa5RijVKsUYo1SrFGKdYo/wEcAvr4sBmb6wAAAABJRU5ErkJggg==';
+const SELF_TEST_TIMEOUT_MS = 1500;
+
+let selfTestImagePromise = null;
+
+function loadSelfTestImage() {
+  if (!selfTestImagePromise) {
+    selfTestImagePromise = new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => {
+        selfTestImagePromise = null;
+        reject(new Error('self-test QR image failed to decode'));
+      };
+      image.src = SELF_TEST_QR_PNG;
+    });
+  }
+  return selfTestImagePromise;
+}
+
+function withTimeout(promise, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
+// Prove the detector can decode a code we know is in the image. A detector that hangs must
+// not hang the camera start, hence the timeout.
+async function detectorDecodesKnownCode(detector) {
+  const attempt = loadSelfTestImage()
+    .then((image) => detector.detect(image))
+    .then((codes) => codes.some((code) => code.rawValue === SELF_TEST_VALUE));
+
+  return withTimeout(attempt, SELF_TEST_TIMEOUT_MS).catch(() => false);
+}
+
 async function isNativeQrSupported() {
   if (!('BarcodeDetector' in window) || typeof BarcodeDetector.getSupportedFormats !== 'function') {
     return false;
@@ -278,10 +344,18 @@ function describeError(error) {
  * @returns {Promise<{ name: 'native'|'wasm'|'js', start: Function, stop: Function }>}
  */
 export async function createScanEngine({ skipNative = false } = {}) {
-  // Tier 1 — native BarcodeDetector.
+  // Tier 1 — native BarcodeDetector. Advertised support is not enough: it must actually
+  // decode (see SELF_TEST_QR_PNG), or a silently-blind detector would be selected and the
+  // scanner would never scan.
   if (!skipNative && await isNativeQrSupported()) {
     try {
-      return new NativeEngine(new BarcodeDetector({ formats: ['qr_code'] }));
+      const detector = new BarcodeDetector({ formats: ['qr_code'] });
+
+      if (await detectorDecodesKnownCode(detector)) {
+        return new NativeEngine(detector);
+      }
+
+      console.warn('BarcodeDetector reports qr_code support but cannot decode a known code (a silent failure seen on iOS 18+ and Chrome/macOS Ventura < 113). Skipping the native scanner.');
     } catch (error) {
       console.warn('BarcodeDetector unavailable, trying WebAssembly scanner:', error);
     }
