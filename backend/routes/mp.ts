@@ -5,7 +5,7 @@ import path from 'path';
 
 import { DATA_DIR } from '../config.js';
 import { getMPInstance, updateMissingIdCards, type MPInstance } from '../services/mp-service.js';
-import { strictLimiter } from '../middleware.js';
+import { strictLimiter } from '../rate-limits.js';
 
 export const mpRouter = express.Router();
 

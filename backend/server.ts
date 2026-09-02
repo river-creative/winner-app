@@ -11,10 +11,11 @@ import { startTextingScheduler } from './services/texting-scheduler.js';
 import {
   corsMiddleware,
   helmetMiddleware,
-  generalLimiter,
   sessionAuth,
   securityHeaders
 } from './middleware.js';
+import { generalLimiter } from './rate-limits.js';
+import { loadAuthConfig } from './auth-config.js';
 import { sessions, SESSION_DURATION } from './routes/auth.js';
 
 // Load environment variables
@@ -30,15 +31,17 @@ app.use(corsMiddleware);
 app.use(helmetMiddleware);
 app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
-app.use('/api', generalLimiter);
-app.use('/api', sessionAuth);
 app.use(securityHeaders);
 
 // Create main router
 const mainRouter = express.Router();
 
-// Mount API router
-mainRouter.use('/api', apiRouter);
+// Mount API router WITH its guards attached.
+// These were previously registered as `app.use('/api', …)`, which only matches paths beginning
+// `/api` — but mainRouter is also mounted at `/win`, so `/win/api/*` entered every API route with
+// no authentication and no rate limit. Attaching them here makes the guards travel with the
+// router to every mount point, so a future mount cannot reopen the hole.
+mainRouter.use('/api', generalLimiter, sessionAuth, apiRouter);
 
 // Serve uploaded images
 mainRouter.use('/uploads', express.static(UPLOADS_DIR));
@@ -94,6 +97,11 @@ app.use('/', mainRouter);
 app.use('/win', mainRouter);
 
 async function startServer(): Promise<void> {
+  // Validate the auth environment before binding the port. A missing ADMIN_PASSWORD or
+  // GOOGLE_CLIENT_ID used to surface as a 500 the first time somebody tried to sign in — which
+  // is to say, at the worst possible moment. Now the container refuses to start and says why.
+  loadAuthConfig();
+
   await ensureDataDir();
   startTextingScheduler();
   app.listen(PORT, () => {
@@ -101,4 +109,7 @@ async function startServer(): Promise<void> {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((error) => {
+  console.error('Server failed to start:', error instanceof Error ? error.message : error);
+  process.exit(1);
+});

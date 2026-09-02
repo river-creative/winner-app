@@ -150,6 +150,32 @@ winner-app/
 - **Error handling**: Graceful error recovery throughout
 - **Data integrity**: Automatic backups and restore points
 
+### Authentication
+
+Two sign-in paths, both ending in the same `session` cookie (HttpOnly, SameSite=Lax, 3 days,
+persisted to `data/sessions.json` so a deploy does not sign everyone out):
+
+1. **Google sign-in (primary)** — Google Identity Services, ID-token only: no client secret, no
+   code exchange, no API scopes. The browser gets an ID token and POSTs it to
+   `/api/auth/google`, which verifies it against Google's signing keys and the configured
+   audience, then requires the `hd` claim to match `GOOGLE_HOSTED_DOMAIN`, the email to be
+   verified, and the address itself to sit inside that domain. Any `@revival.com` Workspace
+   account can sign in — there is no per-user allow-list.
+2. **Admin credentials (backdoor)** — `ADMIN_USERNAME` / `ADMIN_PASSWORD` from `.env`, behind a
+   disclosure on the login page. Retained on purpose: prize-scanner volunteers have no Workspace
+   account, and it is the way back in if Google is unreachable. Compared in constant time and
+   rate-limited to 10 attempts/minute in production.
+
+Both endpoints are unauthenticated by definition and carry the strict rate limiter.
+`GOOGLE_CLIENT_ID`, `GOOGLE_HOSTED_DOMAIN`, `ADMIN_USERNAME` and `ADMIN_PASSWORD` are **all
+required** — the server validates them at startup and refuses to boot if any is missing, rather
+than failing at the first sign-in attempt.
+
+**Google Cloud Console:** the client ID must list this app's origins under *Authorized
+JavaScript origins* (`https://win.revival.com`, `http://localhost:3000`,
+`http://localhost:3001`). Without them the button renders but no sign-in ever succeeds; the
+admin path is unaffected.
+
 ## 🎨 User Interface Highlights
 
 ### Public Selection Interface

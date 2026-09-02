@@ -4,9 +4,17 @@ import { Settings } from '../src/js/modules/settings.js';
 import { UI } from '../src/js/modules/ui.js';
 import { Scanner } from './scanner.js';
 import { WinnerSearch } from './winner-search.js';
+import { signOut } from '../src/js/modules/auth.js';
 
 // Initialize the scan application
 async function initializeScanApp() {
+  // The store is guaranteed to exist here (waitForAlpine gates on it). Replace the sign-out
+  // placeholder BEFORE the first await: everything below can throw, and a failed startup is
+  // exactly when an operator needs the way out to still work — otherwise the button is a no-op
+  // on the one screen they cannot get past.
+  const store = Alpine.store('scan');
+  store.signOut = signOut;
+
   try {
     // Initialize database
     await Database.initDB();
@@ -14,9 +22,6 @@ async function initializeScanApp() {
     // Load settings and apply theme
     await Settings.loadSettings();
     Settings.setupTheme();
-
-    // Get the Alpine store
-    const store = Alpine.store('scan');
 
     // Apply saved theme
     document.body.setAttribute('data-theme', store.darkMode ? 'dark' : 'light');

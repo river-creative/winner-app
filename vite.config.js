@@ -48,7 +48,7 @@ function sessionAuthPlugin() {
 
         // Verify session with backend
         try {
-          const response = await fetch('http://localhost:3001/api/session', {
+          const response = await fetch('http://localhost:3001/api/auth/session', {
             headers: { Cookie: `session=${sessionToken}` }
           });
 

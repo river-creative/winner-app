@@ -145,44 +145,423 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* ---- Google sign-in (primary path) ---- */
+
+    /* GIS renders its button into this element. Centred so the fixed-pixel width GIS produces
+       still lines up with the full-width controls below it. */
+    .google-slot {
+      display: flex;
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    /* Skeleton stands in for the button while the config request and the GIS script are in
+       flight — the layout is known ahead of time, so it holds its place instead of jumping. */
+    .google-skeleton {
+      width: 100%;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: 0 0; }
+    }
+
+    .google-note {
+      font-size: 0.8125rem;
+      color: #6b7280;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.5rem 0 1rem;
+      color: #9ca3af;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e5e7eb;
+    }
+
+    /* ---- Admin credentials (the backdoor, deliberately secondary) ---- */
+
+    .disclosure {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.625rem;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #6b7280;
+      background: none;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .disclosure:hover {
+      border-color: #d1d5db;
+      color: #374151;
+    }
+
+    .disclosure:focus-visible {
+      outline: none;
+      border-color: #0A4f7B;
+      box-shadow: 0 0 0 3px rgba(10, 79, 123, 0.1);
+    }
+
+    .disclosure .chevron {
+      transition: transform 0.2s;
+      font-size: 0.75rem;
+    }
+
+    .disclosure[aria-expanded="true"] .chevron {
+      transform: rotate(180deg);
+    }
+
+    #adminPanel {
+      margin-top: 1.25rem;
+      animation: fade-in 0.2s ease;
+    }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: none; }
+    }
+
+    /* Respect a reduced-motion preference for the two looping/entrance animations above. */
+    @media (prefers-reduced-motion: reduce) {
+      .google-skeleton,
+      #adminPanel,
+      .spinner {
+        animation: none;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="login-card">
     <div class="logo">
-      <img src="/favicon.png" alt="Winner App">
+      <img src="/favicon.png" alt="">
       <h1>Winner App</h1>
       <p>Sign in to continue</p>
     </div>
 
-    <div class="error-message" id="errorMessage">
-      <i class="bi bi-exclamation-circle"></i>
+    <!-- role=alert + aria-live announces failures to screen readers; the element stays in the
+         DOM so the live region is registered before the first message lands in it. -->
+    <div class="error-message" id="errorMessage" role="alert" aria-live="assertive">
+      <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
       <span id="errorText">Invalid credentials</span>
     </div>
 
-    <form id="loginForm">
-      <div class="form-group">
-        <label class="form-label" for="username">Username</label>
-        <input type="text" class="form-input" id="username" name="username" placeholder="Enter username" required autocomplete="username">
-      </div>
+    <div class="google-slot" id="googleSlot">
+      <div id="googleButton"></div>
+      <div class="google-skeleton" id="googleSkeleton"></div>
+    </div>
+    <p class="google-note" id="googleStatus" role="status" hidden>Signing you in&hellip;</p>
+    <p class="google-note" id="googleUnavailable" hidden>
+      Google sign-in is unavailable right now. Use admin credentials below.
+    </p>
 
-      <div class="form-group">
-        <label class="form-label" for="password">Password</label>
-        <input type="password" class="form-input" id="password" name="password" placeholder="Enter password" required autocomplete="current-password">
-      </div>
+    <div class="divider"><span>or</span></div>
 
-      <button type="submit" class="login-btn" id="loginBtn">
-        <span id="btnText">Sign In</span>
-      </button>
-    </form>
+    <button type="button" class="disclosure" id="adminToggle" aria-expanded="false" aria-controls="adminPanel">
+      <i class="bi bi-key" aria-hidden="true"></i>
+      <span>Sign in with admin credentials</span>
+      <i class="bi bi-chevron-down chevron" aria-hidden="true"></i>
+    </button>
+
+    <div id="adminPanel" hidden>
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input type="text" class="form-input" id="username" name="username" placeholder="Enter username" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <input type="password" class="form-input" id="password" name="password" placeholder="Enter password" required autocomplete="current-password">
+        </div>
+
+        <button type="submit" class="login-btn" id="loginBtn">
+          <span id="btnText">Sign In</span>
+        </button>
+      </form>
+    </div>
   </div>
 
   <script>
-    const form = document.getElementById('loginForm');
+    const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+    // GIS renders a fixed-pixel-width button and caps it at 400.
+    const GOOGLE_BUTTON_MAX_WIDTH = 400;
+    const GOOGLE_BUTTON_MIN_WIDTH = 200;
+
     const errorMessage = document.getElementById('errorMessage');
     const errorText = document.getElementById('errorText');
+    const googleSlot = document.getElementById('googleSlot');
+    const googleButton = document.getElementById('googleButton');
+    const googleSkeleton = document.getElementById('googleSkeleton');
+    const googleStatus = document.getElementById('googleStatus');
+    const googleUnavailable = document.getElementById('googleUnavailable');
+    const adminToggle = document.getElementById('adminToggle');
+    const adminPanel = document.getElementById('adminPanel');
+    const form = document.getElementById('loginForm');
     const loginBtn = document.getElementById('loginBtn');
     const btnText = document.getElementById('btnText');
+
+    // API base is relative so it resolves correctly whether the app is served at / or /win.
+    const API_BASE = './api';
+
+    // Which method this browser signed in with last. Shared scanner tablets use the admin
+    // credentials every time, so opening straight to that form saves them a click; staff
+    // browsers keep Google in front. Purely a per-browser convenience — every read and write is
+    // guarded because storage throws outright in some private-browsing modes.
+    const LAST_METHOD_KEY = 'login_last_method';
+
+    function readLastMethod() {
+      try {
+        return localStorage.getItem(LAST_METHOD_KEY);
+      } catch {
+        return null;
+      }
+    }
+
+    function rememberMethod(method) {
+      try {
+        localStorage.setItem(LAST_METHOD_KEY, method);
+      } catch {
+        // Storage unavailable — the next visit just opens on the default, which is fine.
+      }
+    }
+
+    /**
+     * Where to go after a successful sign-in.
+     *
+     * The `redirect` parameter is attacker-controllable — anyone can hand out a link to this
+     * page. Resolving it against our own origin and requiring it to stay there turns an open
+     * redirect (which would drop a freshly-signed-in operator on a convincing fake login page)
+     * into a same-origin path. Also rejects the protocol-relative "//evil.example" form and
+     * non-http schemes, both of which resolve to a different origin.
+     */
+    function safeRedirectTarget() {
+      const raw = new URLSearchParams(window.location.search).get('redirect');
+      if (!raw) return './';
+      try {
+        const url = new URL(raw, window.location.origin);
+        if (url.origin !== window.location.origin) return './';
+        return url.pathname + url.search + url.hash;
+      } catch {
+        return './';
+      }
+    }
+
+    function showError(message) {
+      errorText.textContent = message;
+      errorMessage.classList.add('show');
+    }
+
+    function clearError() {
+      errorMessage.classList.remove('show');
+    }
+
+    /** Turns a failed Response into the most useful message available, without assuming JSON. */
+    async function messageFromResponse(response, fallbackVerb) {
+      try {
+        const data = await response.json();
+        if (data?.error) return data.error;
+      } catch {
+        // Not JSON — a dev-proxy 500 or an nginx 502 means the server is unreachable rather
+        // than that the request was rejected.
+        if (response.status >= 500) return 'Cannot reach the server. Please try again shortly.';
+      }
+      return `${fallbackVerb} failed (${response.status}). Please try again.`;
+    }
+
+    /** Reveals the admin form. `expandedByUser` keeps focus behaviour out of the automatic case. */
+    function expandAdminPanel(expandedByUser) {
+      adminPanel.hidden = false;
+      adminToggle.setAttribute('aria-expanded', 'true');
+      if (expandedByUser) {
+        document.getElementById('username').focus();
+      }
+    }
+
+    function collapseAdminPanel() {
+      adminPanel.hidden = true;
+      adminToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    adminToggle.addEventListener('click', () => {
+      if (adminPanel.hidden) {
+        expandAdminPanel(true);
+      } else {
+        collapseAdminPanel();
+      }
+    });
+
+    /** Google is unreachable/blocked: say so and put the working path in front of the user. */
+    function markGoogleUnavailable() {
+      googleSkeleton.hidden = true;
+      googleStatus.hidden = true;
+      // Collapse the slot too — an empty 44px gap above the notice reads as a button that failed
+      // to paint rather than a path that is unavailable.
+      googleSlot.hidden = true;
+      googleUnavailable.hidden = false;
+      expandAdminPanel(false);
+    }
+
+    /** Verifying a Google credential is a network round-trip; say so instead of going quiet. */
+    function setGoogleBusy(busy) {
+      googleSlot.hidden = busy;
+      googleStatus.hidden = !busy;
+    }
+
+    // Load the Google Identity Services client script once. Resolves when window.google.accounts.id
+    // is available; rejects if the script fails to load (CSP, ad-blocker, or offline).
+    function loadGisScript() {
+      return new Promise((resolve, reject) => {
+        if (window.google?.accounts?.id) return resolve();
+
+        const existing = document.querySelector(`script[src="${GIS_SCRIPT_SRC}"]`);
+        if (existing) {
+          existing.addEventListener('load', () => resolve(), { once: true });
+          existing.addEventListener('error', () => reject(new Error('Failed to load Google sign-in')), { once: true });
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = GIS_SCRIPT_SRC;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Google sign-in'));
+        document.head.appendChild(script);
+      });
+    }
+
+    // GIS callback: exchange the Google ID token for a session cookie.
+    async function handleCredential(response) {
+      clearError();
+      setGoogleBusy(true);
+      try {
+        const result = await fetch(`${API_BASE}/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+
+        if (result.ok) {
+          rememberMethod('google');
+          window.location.href = safeRedirectTarget();
+          return;
+        }
+
+        // 403 carries the server's explanation (wrong domain, unverified address) verbatim —
+        // it is the one message that tells the user what to do differently.
+        showError(await messageFromResponse(result, 'Sign in'));
+      } catch {
+        showError('Cannot reach the server. Please check your connection and try again.');
+      }
+
+      // Deliberately not in a `finally`: that would also run on the success path above, flashing
+      // the button back on screen while the browser is already navigating away. Only a sign-in
+      // that failed gets the button back for a retry.
+      setGoogleBusy(false);
+    }
+
+    /** GIS needs an explicit pixel width, so it is derived from the card and kept in sync. */
+    function googleButtonWidth() {
+      const available = googleButton.parentElement.clientWidth;
+      return Math.round(Math.min(GOOGLE_BUTTON_MAX_WIDTH, Math.max(GOOGLE_BUTTON_MIN_WIDTH, available)));
+    }
+
+    function renderGoogleButton() {
+      // Clear first: whether GIS replaces or appends into the container is not something to
+      // depend on, and a re-render that appends would stack a second button on every resize.
+      googleButton.replaceChildren();
+      window.google.accounts.id.renderButton(googleButton, {
+        theme: 'outline',
+        size: 'large',
+        text: 'signin_with',
+        shape: 'rectangular',
+        width: googleButtonWidth()
+      });
+    }
+
+    async function initGoogleSignIn() {
+      const response = await fetch(`${API_BASE}/auth/config`);
+      if (!response.ok) throw new Error(`Auth config request failed (${response.status})`);
+      const config = await response.json();
+      if (!config.clientId) throw new Error('Auth config carried no client ID');
+
+      await loadGisScript();
+      if (!window.google?.accounts?.id) throw new Error('Google Identity Services did not initialise');
+
+      window.google.accounts.id.initialize({
+        client_id: config.clientId,
+        callback: handleCredential,
+        hosted_domain: config.hostedDomain,
+        auto_select: false
+      });
+
+      renderGoogleButton();
+      googleSkeleton.hidden = true;
+
+      // renderButton can fail quietly — an unauthorised origin leaves the container empty and the
+      // page looks fine while being unable to sign anyone in. The check is deferred rather than
+      // immediate so it cannot race GIS's own insertion, and it only ever downgrades to the
+      // admin path; it never blocks a button that did render.
+      setTimeout(() => {
+        if (googleButton.childElementCount === 0) {
+          console.error('[login] Google button did not render — check Authorized JavaScript origins for this client ID.');
+          markGoogleUnavailable();
+        }
+      }, 2000);
+
+      // Keep the fixed-width button in step with the card across rotation/resize.
+      let resizeTimer;
+      let lastWidth = googleButtonWidth();
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          const width = googleButtonWidth();
+          if (width === lastWidth) return;
+          lastWidth = width;
+          renderGoogleButton();
+        }, 150);
+      });
+    }
+
+    // Open on the admin form for a browser that last used it, before Google finishes loading —
+    // no flash of the wrong panel.
+    if (readLastMethod() === 'admin') {
+      expandAdminPanel(false);
+    }
+
+    initGoogleSignIn().catch((error) => {
+      console.error('[login] Google sign-in unavailable:', error);
+      markGoogleUnavailable();
+    });
+
+    // ---- Admin credentials (the backdoor) ----
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -193,10 +572,10 @@
       // Show loading state
       loginBtn.disabled = true;
       btnText.innerHTML = '<div class="spinner"></div>';
-      errorMessage.classList.remove('show');
+      clearError();
 
       try {
-        const response = await fetch('/api/login', {
+        const response = await fetch(`${API_BASE}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -205,38 +584,20 @@
         });
 
         if (response.ok) {
-          // Redirect to the originally requested page or home
-          const redirect = new URLSearchParams(window.location.search).get('redirect') || '/';
-          window.location.href = redirect;
+          rememberMethod('admin');
+          window.location.href = safeRedirectTarget();
           return;
         }
 
-        // Server responded with an error. Prefer its JSON message, but fall back
-        // gracefully if the body isn't JSON (e.g. a dev-proxy 500 or nginx 502),
-        // which signals the server is unreachable rather than an app-level error.
-        let message;
-        try {
-          const data = await response.json();
-          message = data?.error || `Sign in failed (${response.status}).`;
-        } catch {
-          message = response.status >= 500
-            ? 'Cannot reach the server. Please try again shortly.'
-            : `Sign in failed (${response.status}). Please try again.`;
-        }
-        errorText.textContent = message;
-        errorMessage.classList.add('show');
+        showError(await messageFromResponse(response, 'Sign in'));
       } catch (error) {
         // fetch threw = server completely unreachable (backend down / network error).
-        errorText.textContent = 'Cannot reach the server. Please check your connection and try again.';
-        errorMessage.classList.add('show');
+        showError('Cannot reach the server. Please check your connection and try again.');
       } finally {
         loginBtn.disabled = false;
         btnText.textContent = 'Sign In';
       }
     });
-
-    // Focus username field on load
-    document.getElementById('username').focus();
   </script>
 </body>
 </html>

@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import { sessions, SESSION_DURATION } from './routes/auth.js';
 
 // CORS configuration - whitelist allowed origins
@@ -39,27 +38,7 @@ export const helmetMiddleware = helmet({
   contentSecurityPolicy: false
 });
 
-// Rate limiting - general: 100 requests per minute (disabled in dev mode)
-// Default to dev mode unless NODE_ENV is explicitly 'production'
-const isDev = process.env.NODE_ENV !== 'production';
-export const generalLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: isDev ? 0 : 100, // 0 = unlimited in dev mode
-  message: { error: 'Too many requests, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isDev // Skip rate limiting entirely in dev mode
-});
-
-// Rate limiting - strict: 10 requests per minute for sensitive endpoints (disabled in dev mode)
-export const strictLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: isDev ? 0 : 10, // 0 = unlimited in dev mode
-  message: { error: 'Too many requests to sensitive endpoint' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: () => isDev // Skip rate limiting entirely in dev mode
-});
+// Rate limiters live in ./rate-limits.js — see the note there on why they are not in this file.
 
 // Clean 401 error page HTML
 const authErrorPage = `<!DOCTYPE html>
@@ -146,8 +125,18 @@ const authErrorPage = `<!DOCTYPE html>
 
 // Session-based authentication middleware for API endpoints
 export function sessionAuth(req: Request, res: Response, next: NextFunction) {
-  // Skip auth for public endpoints (paths are relative to /api mount point)
-  const publicPaths = ['/health', '/login', '/logout', '/session'];
+  // Skip auth for public endpoints (paths are relative to /api mount point).
+  // Every /auth/* route is public by nature: the two sign-in endpoints ARE the login, /session
+  // reports its own 401, and /logout must stay reachable so an expired session can still be
+  // cleared. They are rate-limited instead — see ./rate-limits.js.
+  const publicPaths = [
+    '/health',
+    '/auth/config',
+    '/auth/google',
+    '/auth/login',
+    '/auth/logout',
+    '/auth/session'
+  ];
   if (publicPaths.includes(req.path)) {
     return next();
   }
@@ -177,14 +166,19 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   if (!req.path.includes('/api/')) {
     res.setHeader(
       'Content-Security-Policy',
+      // Google Identity Services needs four of these directives. Google's guidance is to allow
+      // the parent URL https://accounts.google.com/gsi/ rather than enumerate endpoints, except
+      // for the library itself which is the exact file .../gsi/client. Without them the sign-in
+      // button fails silently: the script is blocked, and the button renders in an iframe that
+      // `frame-src 'none'` would refuse.
       "default-src 'self' https:; " +
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://*.gstatic.com https://unpkg.com; " +
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://*.gstatic.com https://unpkg.com https://accounts.google.com/gsi/client; " +
       "worker-src 'self' blob:; " +
-      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
+      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://accounts.google.com/gsi/; " +
       "font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; " +
       "img-src 'self' data: https:; " +
-      "connect-src 'self' https:; " +
-      "frame-src 'none'; " +
+      "connect-src 'self' https: https://accounts.google.com/gsi/; " +
+      "frame-src https://accounts.google.com/gsi/; " +
       "object-src 'none'; " +
       "base-uri 'self';"
     );

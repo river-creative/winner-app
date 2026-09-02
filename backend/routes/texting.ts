@@ -9,7 +9,7 @@ import {
   processQueue,
   getJobStats
 } from '../services/texting.js';
-import { strictLimiter } from '../middleware.js';
+import { strictLimiter } from '../rate-limits.js';
 
 export const textingRouter = express.Router();
 

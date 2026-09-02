@@ -19,6 +19,7 @@ import { Reports } from './modules/reports.js';
 import { MinistryPlatform } from './modules/ministryplatform.js';
 import { Templates } from './modules/templates.js';
 import KeyboardShortcuts from './modules/keyboard-shortcuts.js';
+import { getSession, sessionLabel, signOut } from './modules/auth.js';
 
 // Global state variables (now truly central)
 export let appModal = null;
@@ -442,7 +443,34 @@ function setupManagementListeners() {
   if (restoreOnline) eventManager.on(restoreOnline, 'click', Export.handleRestoreOnline);
   if (undoLastSelection) eventManager.on(undoLastSelection, 'click', Winners.undoLastSelection);
 
+  // Account: who is signed in, and the way out
+  const signOutBtn = document.getElementById('signOut');
+  if (signOutBtn) {
+    eventManager.on(signOutBtn, 'click', (event) => {
+      event.preventDefault();
+      signOut();
+    });
+  }
+  showSignedInUser();
+
   // Clear filters button - now handled by Alpine @click in HTML
+}
+
+/**
+ * Labels the account menu with the signed-in user. The header keeps its generic "Signed in"
+ * text if the probe fails — the menu's other entries still work, so a failed lookup must not
+ * blank out a heading that is already on screen.
+ */
+async function showSignedInUser() {
+  const label = document.getElementById('sessionLabel');
+  if (!label) return;
+
+  const session = await getSession();
+  if (!session) return;
+
+  // textContent, never innerHTML: this is a value that came back from the server.
+  label.textContent = `Signed in as ${sessionLabel(session)}`;
+  label.title = sessionLabel(session);
 }
 
 function setupWinnerFilters() {
