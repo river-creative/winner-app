@@ -133,7 +133,13 @@ collectionsRouter.put('/:collection/:id', async (req: Request, res: Response) =>
     }
 
     data[index] = { ...data[index], ...updateData };
-    await writeCollection(collection, data);
+    // writeCollection returns false on EACCES/ENOSPC rather than throwing, so the result has to
+    // be checked — reporting success for a persist that did not happen leaves the client showing
+    // an edit that is not on disk.
+    const writeSuccess = await writeCollection(collection, data);
+    if (!writeSuccess) {
+      return res.status(500).json({ error: `Failed to write ${collection} data` });
+    }
 
     res.json({ success: true, data: data[index] });
   } catch (error: any) {
@@ -161,7 +167,11 @@ collectionsRouter.delete('/:collection/:id', async (req: Request, res: Response)
     }
 
     data.splice(index, 1);
-    await writeCollection(collection, data);
+    // Same as PUT: an unchecked write reports a deletion that may still be on disk.
+    const writeSuccess = await writeCollection(collection, data);
+    if (!writeSuccess) {
+      return res.status(500).json({ error: `Failed to write ${collection} data` });
+    }
 
     res.json({ success: true });
   } catch (error: any) {

@@ -88,45 +88,64 @@ export async function readCollection(collection: string): Promise<CollectionItem
   return parsed as CollectionItem[];
 }
 
+/**
+ * Writes a collection to disk atomically: serialise into a temp file in the same directory,
+ * flush it to stable storage, then rename over the target. Rename within a directory is atomic,
+ * so a reader sees either the whole old file or the whole new one — never a partial write.
+ *
+ * The fsync is what makes that hold across a crash or power loss. Without it the rename can
+ * reach the disk before the file contents do, leaving a ZERO-LENGTH file — which is exactly the
+ * corruption `readCollection` now refuses to mistake for an empty collection.
+ *
+ * There is deliberately NO fallback to writing the target directly. The previous version did
+ * that whenever the atomic path failed, and a direct write truncates the live file before it
+ * writes a byte — so the fallback turned "could not write safely" into "destroyed the existing
+ * data", and then returned true. Returning false instead leaves the good file in place; every
+ * caller already branches on it to decide its status code.
+ */
 export async function writeCollection(collection: string, data: CollectionItem[]): Promise<boolean> {
-  try {
-    const filePath = path.join(DATA_DIR, `${collection}.json`);
+  const filePath = path.join(DATA_DIR, `${collection}.json`);
+  // Unique per write: a fixed temp name lets two concurrent writes to the same collection
+  // clobber each other's temp file, so one rename publishes the other's data and the loser
+  // fails on a file that is already gone. Settings in particular are saved in rapid bursts.
+  const tempPath = path.join(
+    DATA_DIR,
+    `.${collection}.json.${process.pid}.${Math.random().toString(36).slice(2, 10)}.tmp`
+  );
 
+  try {
     // Ensure directory exists before writing
     await fs.mkdir(DATA_DIR, { recursive: true });
 
-    // Write to a temporary file in the same directory (for atomic rename to work)
-    const tempPath = path.join(DATA_DIR, `.${collection}.json.tmp`);
-
+    const serialised = JSON.stringify(data, null, 2);
+    const handle = await fs.open(tempPath, 'w');
     try {
-      // Write to temp file
-      await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf8');
-
-      // Atomic rename (works only if temp and target are on same filesystem)
-      await fs.rename(tempPath, filePath);
-
-      console.log(`Successfully wrote ${data.length} items to ${collection}.json`);
-      return true;
-
-    } catch (writeError: any) {
-      // If anything fails, try to clean up temp file and use direct write
-      try {
-        await fs.unlink(tempPath);
-      } catch {
-        // Ignore cleanup errors
-      }
-
-      // Fall back to direct write (not atomic but better than failing)
-      console.log(`Atomic write failed for ${collection}.json, using direct write. Error: ${writeError.message}`);
-      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-      console.log(`Direct write succeeded for ${collection}.json`);
-      return true;
+      await handle.writeFile(serialised, 'utf8');
+      await handle.sync();
+    } finally {
+      await handle.close();
     }
 
+    // Atomic rename (temp and target are in the same directory, so always same filesystem)
+    await fs.rename(tempPath, filePath);
+
+    console.log(`Successfully wrote ${data.length} items to ${collection}.json`);
+    return true;
+
   } catch (error: any) {
+    // The existing file was never opened for writing, so it is still intact. Drop the partial
+    // temp file so a failed write leaves nothing behind.
+    try {
+      await fs.unlink(tempPath);
+    } catch {
+      // Never created, or already gone — nothing to clean up.
+    }
+
     console.error(`Error writing ${collection}:`, error);
     if (error.code === 'EACCES') {
       console.error(`Permission denied writing to ${collection}.json. Check file/directory permissions.`);
+    } else if (error.code === 'ENOSPC') {
+      console.error(`No space left on device while writing ${collection}.json — existing data left untouched.`);
     } else if (error.code === 'ENOENT') {
       console.error(`Failed to create directory or write file for ${collection}.json`);
     }
