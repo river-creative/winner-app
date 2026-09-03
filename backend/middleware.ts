@@ -33,9 +33,27 @@ export const corsMiddleware = cors({
   credentials: true
 });
 
-// Security headers (skip CSP since we have custom one below)
+// Security headers (skip CSP since we have custom one below).
+//
+// Two of helmet's defaults break Sign in with Google outright, so both are overridden here
+// rather than left implicit:
+//
+//   * Referrer-Policy defaults to `no-referrer`. GIS identifies the embedding origin from the
+//     Referer header on its /gsi/button iframe request; with no Referer it cannot, and rejects
+//     the page with "The given origin is not allowed for the given client ID" — regardless of
+//     what is actually registered in Google Cloud Console, which makes it look like a console
+//     misconfiguration. Verified by rewriting only this header against the live site: the same
+//     page and client went from 400 to 200. `strict-origin-when-cross-origin` sends the origin
+//     only — never the path, and nothing on an HTTPS->HTTP downgrade — and is both what GIS
+//     needs and the modern browser default.
+//   * Cross-Origin-Opener-Policy defaults to `same-origin`, which severs `window.opener` when
+//     the sign-in popup navigates to accounts.google.com, leaving the credential with no way
+//     back to the page. `same-origin-allow-popups` is Google's documented requirement and still
+//     isolates this page from everything except the popups it opens itself.
 export const helmetMiddleware = helmet({
-  contentSecurityPolicy: false
+  contentSecurityPolicy: false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 });
 
 // Rate limiters live in ./rate-limits.js — see the note there on why they are not in this file.
