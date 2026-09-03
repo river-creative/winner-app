@@ -25,41 +25,67 @@ export async function ensureDataDir(): Promise<void> {
   }
 }
 
+/**
+ * Reads a collection from disk.
+ *
+ * An empty array is returned for exactly ONE case: the file does not exist yet. That is the
+ * only state that genuinely means "no data", and it is how every collection starts.
+ *
+ * Every other failure throws, because of what callers do with the result: `POST /:collection`
+ * and `/batch-save` read the collection, merge the incoming item into it, and write the whole
+ * thing back. An empty array handed back for a file that DOES exist is therefore not a safe
+ * default — it is total data loss on the very next save, and the file left behind looks
+ * perfectly valid, so nothing ever reports it.
+ *
+ * That is not hypothetical. `settings` used to be exempted here and returned [] on a parse
+ * error; winner-app's production settings were reduced to just the single key that happened to
+ * be saved next, with nothing in the file or the response to indicate anything had gone wrong.
+ * Failing loudly leaves the damaged file intact and recoverable instead.
+ */
 export async function readCollection(collection: string): Promise<CollectionItem[]> {
+  const filePath = path.join(DATA_DIR, `${collection}.json`);
+
+  let raw: string;
   try {
-    const filePath = path.join(DATA_DIR, `${collection}.json`);
-    const data = await fs.readFile(filePath, 'utf8');
-
-    // Handle empty files
-    if (!data || data.trim() === '') {
-      console.log(`Collection ${collection} file is empty, returning empty array`);
-      return [];
-    }
-
-    try {
-      return JSON.parse(data);
-    } catch (parseError) {
-      console.error(`Invalid JSON in ${collection}.json, attempting recovery:`, parseError);
-
-      // For settings collection, try to recover gracefully
-      if (collection === 'settings') {
-        console.log('Initializing empty settings collection due to corrupted file');
-        return [];
-      }
-
-      // For other collections, throw error to prevent data loss
-      throw new Error(`Corrupted JSON in ${collection}.json`);
-    }
+    raw = await fs.readFile(filePath, 'utf8');
   } catch (error: any) {
-    // If file doesn't exist, return empty array (this is ok for new collections)
+    // A missing file is the one benign case: the collection has never been written.
     if (error.code === 'ENOENT') {
       console.log(`Collection ${collection} doesn't exist yet, will be created`);
       return [];
     }
-    // For any other error (permissions, etc), throw it
+    // Anything else (permissions, I/O) must not be mistaken for "no data".
     console.error(`Error reading ${collection}:`, error);
     throw new Error(`Failed to read collection ${collection}: ${error.message}`);
   }
+
+  // A zero-byte file is corruption, never something this app produced: writeCollection
+  // serialises even an empty collection as "[]". Reading it as "no data" would let the next
+  // save overwrite a truncated file with whichever single item was being written.
+  if (raw.trim() === '') {
+    throw new Error(
+      `${collection}.json is empty (0 bytes). This app never writes a 0-byte collection file, ` +
+      `so it is being treated as corruption rather than as an empty collection. Restore it from ` +
+      `a backup, or write "[]" into it to deliberately start the collection over.`
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (parseError: any) {
+    throw new Error(`Corrupted JSON in ${collection}.json: ${parseError.message}`);
+  }
+
+  // Guard the shape too: a file containing `{}` or `null` parses fine, then fails deep inside a
+  // caller's .findIndex/.filter with a message that says nothing about the real problem.
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      `${collection}.json does not contain a JSON array (got ${parsed === null ? 'null' : typeof parsed}).`
+    );
+  }
+
+  return parsed as CollectionItem[];
 }
 
 export async function writeCollection(collection: string, data: CollectionItem[]): Promise<boolean> {
