@@ -98,8 +98,18 @@ echo -e "${GREEN}✅ Preflight passed — compose file and all required env vars
 echo -e "${YELLOW}📁 Syncing files to server...${NC}"
 
 # No --delete: compose.yml and .env live only on the server and must survive.
-rsync -avz --exclude 'node_modules' \
+#
+# --rsync-path="sudo rsync": the deploying user is a member of srvdev, not root,
+# but the existing tree is root-owned from earlier root-run deploys. Writing new
+# files is fine; setting owner, group, permissions and times on the ones already
+# there is not, and -a attempts all four. Every one fails with EPERM and rsync
+# exits 23 — aborting a deploy whose file contents transferred perfectly well.
+# Running the remote side under sudo keeps full -a semantics and leaves ownership
+# consistent with the rest of the tree.
+rsync -avz --rsync-path="sudo rsync" \
+    --exclude 'node_modules' \
     --exclude '.git' \
+    --exclude '.claude' \
     --exclude 'data/' \
     --exclude '.DS_Store' \
     --exclude '*.log' \
