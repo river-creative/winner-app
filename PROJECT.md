@@ -174,7 +174,44 @@ than failing at the first sign-in attempt.
 **Google Cloud Console:** the client ID must list this app's origins under *Authorized
 JavaScript origins* (`https://win.revival.com`, `http://localhost:3000`,
 `http://localhost:3001`). Without them the button renders but no sign-in ever succeeds; the
-admin path is unaffected.
+admin path is unaffected. *Authorized redirect URIs* are not used by this flow and should stay
+empty, and **no client secret is needed** — the server verifies ID tokens and never exchanges
+an authorization code.
+
+#### Two response headers Google sign-in depends on — do not revert them
+
+`helmetMiddleware` in `backend/middleware.ts` overrides two of helmet's defaults. Both
+overrides are load-bearing, and removing either breaks sign-in in a way that does **not** look
+like our bug:
+
+| Header | helmet default | Required | What breaks |
+|---|---|---|---|
+| `Referrer-Policy` | `no-referrer` | `strict-origin-when-cross-origin` | GIS reads the embedding origin from the `Referer` header on its `/gsi/button` iframe request. With none, it rejects **every** origin |
+| `Cross-Origin-Opener-Policy` | `same-origin` | `same-origin-allow-popups` | Severs `window.opener` when the sign-in popup opens, so the credential can never return to the page |
+
+The referrer failure is the dangerous one, because the browser console reports:
+
+```
+[GSI_LOGGER]: The given origin is not allowed for the given client ID.
+```
+
+That message points at Google Cloud Console, where nothing is wrong. On 2026-09-03 it cost
+hours: the origin was re-added, propagation was waited out, and an entirely new OAuth client
+was created — none of which could have helped, because the request never carried an origin for
+Google to check.
+
+**How to tell in one command.** Compare against a page that works with the same client ID —
+RiverRSVP at `mp.revival.com` serves the identical client:
+
+```bash
+curl -sI https://win.revival.com/login      | grep -i 'referrer-policy\|cross-origin-opener'
+curl -sI https://mp.revival.com/rsvp/login  | grep -i 'referrer-policy'
+```
+
+Differing headers mean the headers are the cause, not the console. Note that `curl`-ing
+`/gsi/button` directly proves nothing — it returns 400 even for a known-good origin, because it
+omits parameters GIS sends. Validate any probe against a known-good case before trusting a
+negative.
 
 ## 🎨 User Interface Highlights
 
