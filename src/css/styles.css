@@ -1214,17 +1214,23 @@ body {
 }
 
 /* Progress Overlay */
+/* Moved into whichever <dialog> is open (see src/lib/state/layers.ts), so progress started from
+   inside a modal is actually visible. It stays in the DOM when idle — hidden by class, not by
+   `{#if}` — because an element created later would appear back in <body>, behind the top layer. */
 .progress-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   background: rgba(0, 0, 0, 0.8);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   z-index: 9999;
+}
+
+.progress-overlay.is-visible {
+  display: flex;
 }
 
 
@@ -1299,6 +1305,45 @@ body {
 .color-input::-moz-color-swatch {
   border: none;
   border-radius: 8px;
+}
+
+/* Background image gallery (Settings → Theme & Appearance).
+   A button, not a bare <img> with a click handler as the old app used, so the gallery is
+   keyboard-operable and each thumbnail reports its own pressed state. */
+.image-thumbnail {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+
+.image-thumbnail > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-thumbnail.selected {
+  border-color: var(--selection-color, #10b981);
+}
+
+.image-thumbnail:focus-visible {
+  outline: 2px solid var(--primary-color, #6366f1);
+  outline-offset: 2px;
+}
+
+.image-thumbnail-check {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0.25rem;
+  line-height: 1;
 }
 
 /* Theme Preset Buttons */
@@ -1415,88 +1460,6 @@ body {
 
   .winner-info1 {
     font-size: clamp(0.7rem, 12cqw, 1.1rem);
-  }
-}
-
-/* Responsive Design for Viewport */
-@media (max-width: 768px) {
-  .selection-title {
-    font-size: 2rem;
-  }
-
-  .big-play-button {
-    width: 150px;
-    height: 150px;
-    font-size: 3rem;
-  }
-
-  .winners-grid {
-    height: calc(100vh - 150px);
-    grid-template-columns: repeat(auto-fit, minmax(min(150px, 45%), 1fr));
-  }
-
-  .selection-controls {
-    padding: 2rem 1.5rem;
-    margin: 1rem;
-  }
-
-  .selection-info {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .countdown-number {
-    font-size: 8rem;
-  }
-
-  .prize-name {
-    font-size: 2rem;
-  }
-
-  .app-header {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
-  }
-
-  .main-container {
-    padding: 0.5rem;
-  }
-
-  .history-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .stat-number {
-    font-size: 2rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .selection-controls {
-    padding: 1.5rem 1rem;
-  }
-
-  .big-play-button {
-    width: 120px;
-    height: 120px;
-    font-size: 2.5rem;
-  }
-
-  .winners-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: clamp(0.25rem, 1vw, 0.5rem);
-  }
-
-  .info-card {
-    padding: 0.75rem;
-  }
-
-  .info-value {
-    font-size: 1rem;
-  }
-
-  .info-label {
-    font-size: 0.8rem;
   }
 }
 
@@ -1816,44 +1779,6 @@ body {
   transform: rotate(0) scale(1.15);
 }
 
-/* Tab responsive adjustments */
-@media (max-width: 768px) {
-  .nav-tabs {
-    padding: 0.35rem;
-    overflow-x: auto;
-    overflow-y: hidden;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-  }
-  
-  .nav-tabs::-webkit-scrollbar {
-    height: 4px;
-  }
-  
-  .nav-tabs::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 2px;
-  }
-  
-  .nav-tabs::-webkit-scrollbar-thumb {
-    background: var(--primary-color);
-    border-radius: 2px;
-  }
-  
-  .nav-tabs .nav-link {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    display: inline-flex;
-    align-items: center;
-  }
-  
-  .nav-tabs .nav-link i {
-    font-size: 0.9rem;
-    margin-right: 0.35rem !important;
-  }
-}
-
 /* Pulse animation for active tab */
 @keyframes tabPulse {
   0% {
@@ -2052,6 +1977,11 @@ body {
   overflow: hidden;
   max-width: 0;
   opacity: 0;
+  /* Keeps the three collapsed buttons out of the tab order. Width and opacity alone leave them
+     focusable, so Tab landed on an invisible control. Declared here rather than as a tabindex in
+     the markup because whether the drawer is collapsed at all is a viewport decision — see the
+     `visibility: visible` reset in responsive.css §6. */
+  visibility: hidden;
   transition: max-width 0.3s ease, opacity 0.2s ease, margin 0.3s ease;
   margin-right: 0;
 }
@@ -2059,6 +1989,7 @@ body {
 .list-card-drawer.open {
   max-width: 200px;
   opacity: 1;
+  visibility: visible;
   margin-right: 0;
 }
 
@@ -2216,6 +2147,69 @@ body {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
+/* The control inside a sortable header.
+
+   The old markup hung the click handler on the bare `<th>`, so sorting a table was mouse-only
+   and nothing announced the state. A real button restores both. It is transparent and fills the
+   cell so the header keeps Bootstrap's styling, its padding and the hover above — the button is
+   the affordance, not a second box drawn inside one. */
+.table-sort {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.table-sort:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* Table pager. It wraps rather than switching layout at a breakpoint, so the range text and the
+   page controls stack on a narrow card without a media query owning them. */
+.table-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.table-pager-size {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.table-pager-size .form-label {
+  white-space: nowrap;
+}
+
+.table-pager-size .form-select {
+  width: auto;
+}
+
+.table-pager-range {
+  min-width: 0;
+}
+
+/* The joined winner names of one draw. `min()` keeps the cap from being wider than the cell it
+   is in, which is what the stacked-card layout hands it below the md breakpoint. */
+.history-winner-names {
+  max-width: min(24rem, 100%);
+  vertical-align: bottom;
+}
+
 /* ================================
    IMPORT WIZARD STYLES
    ================================ */
@@ -2252,6 +2246,9 @@ body {
   transition: width 0.4s ease;
 }
 
+/* A <button>, not a <div>: the rail is the only way back to an earlier step, and a div with a
+   click handler cannot be reached by keyboard. The reset strips the UA button chrome so it still
+   renders as the bare circle-and-label the design calls for. */
 .wizard-step {
   display: flex;
   flex-direction: column;
@@ -2259,6 +2256,11 @@ body {
   cursor: pointer;
   z-index: 2;
   transition: all 0.3s ease;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
 }
 
 .wizard-step-circle {
@@ -2374,26 +2376,6 @@ body {
 
 [data-theme="dark"] .wizard-navigation {
   border-top-color: #334155;
-}
-
-/* Responsive wizard */
-@media (max-width: 576px) {
-  .wizard-step-label {
-    font-size: 0.65rem;
-  }
-
-  .wizard-step-circle {
-    width: 32px;
-    height: 32px;
-    font-size: 0.8rem;
-  }
-
-  .wizard-progress-line,
-  .wizard-progress-line-active {
-    top: 16px;
-    left: 30px;
-    right: 30px;
-  }
 }
 
 /* ========================================
@@ -2982,6 +2964,13 @@ body {
   padding: 1rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  /* This is a real <button> now, not a clickable <div> a screen reader announced as one big
+     button with no name. These four undo the UA button defaults so it still fills the row and
+     reads as a card. */
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
 }
 
 .search-result-card:hover {
@@ -3046,175 +3035,602 @@ body {
   color: rgba(255, 255, 255, 0.3);
 }
 
-/* Scan Page Mobile Styles */
-@media (max-width: 768px) {
-  .scanner-header {
-    padding: 0.4rem 0.75rem !important;
-    min-height: 48px !important;
-    height: 48px !important;
-  }
+/* ==========================================================================
+   Native dialogs
+   --------------------------------------------------------------------------
+   Modals are <dialog> elements now, not Bootstrap's JS modal. The element
+   supplies the top layer, the backdrop, focus trapping and Escape; Bootstrap's
+   .modal-dialog / .modal-content classes inside it supply the look, so every
+   existing modal rule — including responsive.css's sticky footer below md and
+   .modal-fullscreen-sm-down — keeps applying unchanged.
 
-  .scanner-header img {
-    width: 28px;
-  }
+   The dialog itself is made a full-viewport, transparent box so that
+   .modal-dialog-centered can centre inside it exactly as it did inside
+   Bootstrap's .modal wrapper.
+   ========================================================================== */
 
-  .scanner-header .header-btn {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.75rem;
-  }
+dialog.app-dialog {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: auto;
+  overscroll-behavior: contain;
+  color: inherit;
+}
 
-  .scanner-header .header-btn i {
-    font-size: 0.85rem;
-  }
+dialog.app-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
 
-  .scanner-container {
-    padding: 0.5rem;
-  }
+/* The panel is the only thing that should catch a click; the rest is backdrop. */
+dialog.app-dialog > .modal-dialog {
+  pointer-events: none;
+}
 
-  .scanner-container .card-body {
-    padding: 0.75rem;
-  }
+dialog.app-dialog > .modal-dialog > .modal-content {
+  pointer-events: auto;
+}
 
-  .scanner-container .card-title {
-    font-size: 1rem;
-    margin-bottom: 0.5rem !important;
-  }
+/* Bootstrap sizes .modal-dialog against .modal's padding; supply it here instead. */
+dialog.app-dialog > .modal-dialog {
+  margin: 1.75rem auto;
+}
 
-  .qr-video-container {
-    max-width: min(260px, calc(100vw - 2rem));
-    border-radius: 15px;
-  }
+dialog.app-dialog > .modal-dialog.modal-dialog-scrollable {
+  max-height: calc(100% - 3.5rem);
+}
 
-  .scanner-controls {
-    margin-top: 0.75rem;
-  }
+/* ==========================================================================
+   Toasts
+   --------------------------------------------------------------------------
+   In-app now, not Toastify from a CDN. Same four colours and the same corner
+   as before; what is new is that the container is an aria-live region and the
+   stack only intercepts pointer events on the toasts themselves — a toast that
+   swallowed a tap aimed at the play button underneath it was a real problem on
+   phones (see responsive.css §10 for the placement half of this).
+   ========================================================================== */
 
-  .scanner-controls button {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
-  }
+/* The stack is moved into whichever <dialog> is open (see src/lib/state/layers.ts), because the
+   top layer is out of reach of any z-index. `position: fixed` survives the move: its containing
+   block is the viewport, and nothing here establishes another one. */
+.app-toasts {
+  position: fixed;
+  inset: auto 1rem 1rem auto;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+  pointer-events: none;
+  max-width: min(24rem, calc(100vw - 2rem));
+}
 
-  .scan-status {
-    font-size: 0.85rem;
-    margin: 0.5rem 0;
-  }
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
 
-  .scanner-container .search-manual {
-    margin-top: 1rem !important;
-  }
+.app-toast-icon {
+  flex: 0 0 auto;
+  font-size: 1.05rem;
+}
 
-  .scanner-container .search-manual p {
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
-  }
+.app-toast-message {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
-  .scanner-container .search-input-group .form-control {
-    font-size: 1rem;
-    padding: 0.75rem;
-  }
+.app-toast-action {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
 
-  .scanner-container .search-input-group .btn {
-    padding: 0.75rem 1.25rem;
-  }
+.app-toast-close {
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
 
-  /* Hide search button label on mobile */
-  .scanner-container .search-input-group .btn .btn-label {
-    display: none;
-  }
+.app-toast-success { background: var(--success-color); }
+.app-toast-error   { background: var(--danger-color); }
+.app-toast-warning { background: var(--warning-color); }
+.app-toast-info    { background: var(--info-color); }
 
-  /* Winner Card Mobile */
-  .winner-card-unified {
-    margin: 0.5rem;
-    border-radius: 12px;
-  }
+/* ==========================================================================
+   Session expired
+   --------------------------------------------------------------------------
+   Deliberately blocking. An expired cookie makes every read fail, and a console
+   that keeps rendering its last state while nothing saves is worse than one
+   that says so. Styled from tokens rather than the inline styles the old
+   plain-DOM version used, since there is always a stylesheet here.
+   ========================================================================== */
 
-  .winner-card-unified .card-body {
-    padding: 1rem;
-  }
+/* A modal <dialog>, so it reaches the top layer above any other open dialog and the page behind
+   it goes inert. `dialog.app-dialog` already strips the UA chrome; this only centres the card. */
+dialog.session-expired {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
 
-  .winner-name-title {
-    font-size: 1.5rem;
-    margin-bottom: 0.75rem;
-  }
+dialog.session-expired[open] {
+  display: flex;
+}
 
-  .winner-meta-info {
-    flex-direction: column;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-  }
+dialog.session-expired::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
 
-  .prizes-title {
-    font-size: 1.1rem;
-  }
+.session-expired-card {
+  background: var(--bs-card-bg, #fff);
+  color: var(--bs-body-color, #1f2937);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
 
-  .prize-item-card {
-    padding: 0.75rem;
-  }
+.session-expired-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
 
-  .prize-name {
-    font-size: 1rem;
-  }
+.session-expired-card h4 {
+  margin-bottom: 0.5rem;
+}
 
-  .prize-meta {
-    font-size: 0.8rem;
-  }
+.session-expired-card p {
+  margin-bottom: 1.25rem;
+}
 
-  .pickup-btn {
-    font-size: 0.9rem;
-    padding: 0.5rem;
-  }
+/* Boot and full-page states (loading the app, a failed start, a route error). */
+.app-boot {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+}
 
-  /* Search Results Mobile */
-  .search-result-card {
-    padding: 0.75rem;
-  }
+/* Skip link — first thing in the console, visible only when focused. */
+.skip-link {
+  position: absolute;
+  z-index: 10;
+  margin: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: #fff;
+  text-decoration: none;
+}
 
-  .search-result-name {
-    font-size: 1rem;
-  }
+/* Utility used where a flex child must be allowed to shrink below its content width. */
+.min-w-0 {
+  min-width: 0;
+}
 
-  .search-result-meta {
-    font-size: 0.8rem;
-  }
+/* ==========================================================================
+   LOGIN PAGE
+   --------------------------------------------------------------------------
+   Moved out of login.html's <style> block when the standalone page became a
+   route. Two deliberate differences, both forced by the move:
 
-  .card-footer-actions .btn {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
-  }
+   1. Everything is scoped under `.login-page`. A standalone document could own
+      bare `.form-label`, `.divider` and `.spinner`; this sheet is global and
+      Bootstrap already defines `.form-label`, so unscoped rules here would
+      restyle every label in the console. The class names themselves are
+      unchanged, which is what the markup and the incident history depend on.
+   2. The `* { margin: 0; padding: 0; box-sizing: border-box }` reset is gone.
+      styles.css already sets `box-sizing` globally, and the two places the
+      margin reset was actually load-bearing — `.logo p` and `.google-note`,
+      both of which Bootstrap's reboot gives a bottom margin — now say so.
 
-  /* Alert Modal Mobile */
-  .alert-modal {
-    padding: 1.5rem;
-    margin: 0.5rem;
-    max-width: calc(100vw - 1rem);
-  }
+   The `prefers-reduced-motion` block stays here with the animations it turns
+   off rather than moving to responsive.css: it is a preference query, not a
+   viewport-width one, so it does not belong to that layer.
+   ========================================================================== */
 
-  .alert-icon {
-    width: 60px;
-    height: 60px;
-    margin-bottom: 1rem;
-  }
+.login-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0A4f7B 0%, #5FA1F7 100%);
+  padding: 1rem;
+}
 
-  .alert-icon i {
-    font-size: 2rem;
-  }
+.login-page .login-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2.5rem;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
 
-  .alert-title {
-    font-size: 1.25rem;
-  }
+.login-page .logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
 
-  .alert-message {
-    font-size: 0.9rem;
-  }
+.login-page .logo img {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 1rem;
+}
 
-  .alert-code {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.75rem;
-  }
+.login-page .logo h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
 
-  .alert-modal .btn {
-    min-width: 120px;
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+/* `margin: 0` on the other three sides replaces the deleted global reset. */
+.login-page .logo p {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0.25rem 0 0;
+}
+
+.login-page .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.login-page .form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.login-page .form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-page .form-input:focus {
+  border-color: #0A4f7B;
+  box-shadow: 0 0 0 3px rgba(10, 79, 123, 0.1);
+}
+
+.login-page .form-input::placeholder {
+  color: #9ca3af;
+}
+
+.login-page .login-btn {
+  width: 100%;
+  padding: 0.875rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #0A4f7B, #5FA1F7);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.login-page .login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(10, 79, 123, 0.4);
+}
+
+.login-page .login-btn:active {
+  transform: translateY(0);
+}
+
+.login-page .login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-page .error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+  display: none;
+}
+
+.login-page .error-message.show {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Blockified by `.login-btn`'s flex context, which is what gives it a box to size. */
+.login-page .spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: login-spin 0.8s linear infinite;
+}
+
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Google sign-in (primary path) ---- */
+
+/* GIS renders its button into this element. Centred so the fixed-pixel width GIS produces
+   still lines up with the full-width controls below it. */
+.login-page .google-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+/* Skeleton stands in for the button while the config request and the GIS script are in
+   flight — the layout is known ahead of time, so it holds its place instead of jumping. */
+.login-page .google-skeleton {
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%);
+  background-size: 400% 100%;
+  animation: login-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes login-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* `margin: 0` replaces the deleted global reset; Bootstrap's reboot gives <p> a bottom one. */
+.login-page .google-note {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.login-page .divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.5rem 0 1rem;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.login-page .divider::before,
+.login-page .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* ---- Admin credentials (the backdoor, deliberately secondary) ---- */
+
+.login-page .disclosure {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  /* min-height keeps this a 44px touch target on a phone; the padding alone
+     left it at 41px. */
+  min-height: 44px;
+  padding: 0.625rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.login-page .disclosure:hover {
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+.login-page .disclosure:focus-visible {
+  outline: none;
+  border-color: #0A4f7B;
+  box-shadow: 0 0 0 3px rgba(10, 79, 123, 0.1);
+}
+
+.login-page .disclosure .chevron {
+  transition: transform 0.2s;
+  font-size: 0.75rem;
+}
+
+.login-page .disclosure[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.login-page #adminPanel {
+  margin-top: 1.25rem;
+  animation: login-fade-in 0.2s ease;
+}
+
+@keyframes login-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Respect a reduced-motion preference for the three looping/entrance animations above. */
+@media (prefers-reduced-motion: reduce) {
+  .login-page .google-skeleton,
+  .login-page #adminPanel,
+  .login-page .spinner {
+    animation: none;
   }
+}
+
+/* ==========================================================================
+   PRIZE CONDITIONS PAGE
+   --------------------------------------------------------------------------
+   Moved out of conditions.html's <style> block. Same scoping reason as the
+   login section above, with one extra: the original's outer element was
+   `.container`, which is a Bootstrap layout class — reusing that name in a
+   global sheet would have restyled every container in the app. It is
+   `.conditions-card` here; the copy is untouched.
+
+   The page's single `@media (max-width: 600px)` block lives in
+   responsive.css, where every viewport-width rule in this app lives.
+   ========================================================================== */
+
+.conditions-page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: linear-gradient(135deg, #667eeab0 0%, #7548a38f 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.conditions-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 700px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.conditions-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 40px 30px;
+  text-align: center;
+}
+
+.conditions-header h1 {
+  font-size: 2.5em;
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.conditions-header .subtitle {
+  font-size: 1.2em;
+  opacity: 0.95;
+}
+
+.conditions-content {
+  padding: 40px 30px;
+}
+
+.conditions-page .requirements-box {
+  background: #f8f9fa;
+  border-left: 5px solid #764ba2;
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+}
+
+.conditions-page .requirements-title {
+  color: #764ba2;
+  font-size: 1.4em;
+  margin: 0 0 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.conditions-page .requirement-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.conditions-page .requirement-item:last-child {
+  margin-bottom: 0;
+}
+
+.conditions-page .requirement-icon {
+  color: #764ba2;
+  margin-right: 15px;
+  font-size: 1.2em;
+  margin-top: 2px;
+}
+
+.conditions-page .requirement-text {
+  flex: 1;
+  color: #333;
+  font-size: 1.1em;
+}
+
+.conditions-page .requirement-text strong {
+  color: #764ba2;
+  font-weight: 600;
+}
+
+.conditions-page .warning-box {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.conditions-page .warning-icon {
+  color: #ff6b6b;
+  font-size: 2em;
+  margin-right: 20px;
+}
+
+.conditions-page .warning-text {
+  flex: 1;
+  color: #856404;
+  font-size: 1.05em;
+  font-weight: 500;
+}
+
+.conditions-page .timer-highlight {
+  display: inline-block;
+  background: #ff6b6b;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-weight: bold;
+  margin: 0 5px;
 }

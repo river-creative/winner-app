@@ -1,0 +1,1407 @@
+/* ============================================================================
+   RESPONSIVE LAYER — every viewport-width rule in the app lives here
+   ============================================================================
+   Loaded after styles.css (see the import order in src/routes/+layout.svelte),
+   so at equal specificity these rules win. styles.css is the desktop/base
+   sheet; it keeps its container queries (component-relative) and its print
+   rules, but no `@media (max-width: …)` block. Keep it that way — two places
+   for the same concern is how the tab strip ended up with a scroll rule that
+   never took effect.
+
+   Breakpoints follow Bootstrap 5 exactly, so utility classes in the markup and
+   rules in here always agree:
+     xs   < 576px      phones, portrait
+     sm  >= 576px      large phones / small tablets   (max-width: 575.98px)
+     md  >= 768px      tablets                        (max-width: 767.98px)
+     lg  >= 992px      laptops                        (max-width: 991.98px)
+   Input-modality queries (hover / pointer) are deliberately width-independent.
+   ============================================================================ */
+
+/* ============================================================================
+   MIGRATED VERBATIM FROM styles.css
+   Behaviour unchanged; they sit first so the new layer below can supersede an
+   individual declaration where one turned out to be the cause of a defect.
+   ============================================================================ */
+
+/* Public display, migrated from styles.css. Declarations the new layer below
+   re-specifies (title, controls, play button, info grid, history stats) were
+   dropped here rather than left in place to be silently overridden, and the
+   `.app-header` / `.main-container` rules went with them — those classes no
+   longer appear in any page or module. */
+@media (max-width: 767.98px) {
+  .winners-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 45%), 1fr));
+  }
+
+  .countdown-number {
+    font-size: 8rem;
+  }
+
+  .prize-name {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .winners-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(0.25rem, 1vw, 0.5rem);
+  }
+}
+/* Tab responsive adjustments, migrated from styles.css. Section 4 below adds
+   the `flex-wrap: nowrap` this block always assumed. */
+@media (max-width: 767.98px) {
+  .nav-tabs {
+    padding: 0.35rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  
+  .nav-tabs::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .nav-tabs::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+  }
+  
+  .nav-tabs::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 2px;
+  }
+  
+  .nav-tabs .nav-link {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+  }
+  
+  .nav-tabs .nav-link i {
+    font-size: 0.9rem;
+    margin-right: 0.35rem !important;
+  }
+}
+/* Import wizard, migrated from styles.css and widened from 576px to the md
+   breakpoint: the five step labels never fitted a phone at any of these sizes,
+   so the new layer hides them outright and the circles carry the progress. The
+   line offset tracks half the circle height. */
+@media (max-width: 767.98px) {
+  .wizard-step-circle {
+    width: 32px;
+    height: 32px;
+    font-size: 0.8rem;
+  }
+
+  .wizard-progress-line,
+  .wizard-progress-line-active {
+    top: 16px;
+    left: 30px;
+    right: 30px;
+  }
+}
+/* Scan Page Mobile Styles, migrated from styles.css (768px → the md edge). */
+@media (max-width: 767.98px) {
+  .scanner-header {
+    padding: 0.4rem 0.75rem !important;
+    min-height: 48px !important;
+    height: 48px !important;
+  }
+
+  .scanner-header img {
+    width: 28px;
+  }
+
+  .scanner-header .header-btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
+  .scanner-header .header-btn i {
+    font-size: 0.85rem;
+  }
+
+  .scanner-container {
+    padding: 0.5rem;
+  }
+
+  .scanner-container .card-body {
+    padding: 0.75rem;
+  }
+
+  .scanner-container .card-title {
+    font-size: 1rem;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .qr-video-container {
+    max-width: min(260px, calc(100vw - 2rem));
+    border-radius: 15px;
+  }
+
+  .scanner-controls {
+    margin-top: 0.75rem;
+  }
+
+  .scanner-controls button {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .scan-status {
+    font-size: 0.85rem;
+    margin: 0.5rem 0;
+  }
+
+  .scanner-container .search-manual {
+    margin-top: 1rem !important;
+  }
+
+  .scanner-container .search-manual p {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .scanner-container .search-input-group .form-control {
+    font-size: 1rem;
+    padding: 0.75rem;
+  }
+
+  .scanner-container .search-input-group .btn {
+    padding: 0.75rem 1.25rem;
+  }
+
+  /* Winner Card Mobile */
+  .winner-card-unified {
+    margin: 0.5rem;
+    border-radius: 12px;
+  }
+
+  .winner-card-unified .card-body {
+    padding: 1rem;
+  }
+
+  .winner-name-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .winner-meta-info {
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .prizes-title {
+    font-size: 1.1rem;
+  }
+
+  .prize-item-card {
+    padding: 0.75rem;
+  }
+
+  .prize-name {
+    font-size: 1rem;
+  }
+
+  .prize-meta {
+    font-size: 0.8rem;
+  }
+
+  .pickup-btn {
+    font-size: 0.9rem;
+    padding: 0.5rem;
+  }
+
+  /* Search Results Mobile */
+  .search-result-card {
+    padding: 0.75rem;
+  }
+
+  .search-result-name {
+    font-size: 1rem;
+  }
+
+  .search-result-meta {
+    font-size: 0.8rem;
+  }
+
+  .card-footer-actions .btn {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+  }
+
+  /* Alert Modal Mobile */
+  .alert-modal {
+    padding: 1.5rem;
+    margin: 0.5rem;
+    max-width: calc(100vw - 1rem);
+  }
+
+  .alert-icon {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 1rem;
+  }
+
+  .alert-icon i {
+    font-size: 2rem;
+  }
+
+  .alert-title {
+    font-size: 1.25rem;
+  }
+
+  .alert-message {
+    font-size: 0.9rem;
+  }
+
+  .alert-code {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.75rem;
+  }
+
+  .alert-modal .btn {
+    min-width: 120px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
+}
+/* ============================================================================
+   NEW RESPONSIVE LAYER
+   Everything below is authored for small screens and touch input. It is loaded
+   after styles.css and after the migrated blocks above, so it wins ties.
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   1. FOUNDATIONS — legible type, a usable container, and safe areas
+   ---------------------------------------------------------------------------- */
+
+/* styles.css sets `html { font-size: 11pt }` (~14.7px) for the desktop console.
+   On a phone that is below the 16px readability floor AND below the threshold
+   at which iOS Safari zooms the page when a field takes focus. Lift the root to
+   16px under the md breakpoint: every rem-based control grows with it, which is
+   also what gets most buttons over the 44px touch-target line. */
+@media (max-width: 767.98px) {
+  html {
+    font-size: 16px;
+  }
+
+  /* Belt and braces for the zoom-on-focus rule: Bootstrap's `-sm` field variants
+     are sized in rem but land under 16px once compact paddings are applied. */
+  .form-control,
+  .form-select,
+  .form-control-sm,
+  .form-select-sm,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* The console gutter. .management-tabs overrides container-fluid's padding, so
+     it is the only thing cancelling the negative margins Bootstrap rows carry —
+     the horizontal padding must stay at least half the gutter or every .row
+     spills past the viewport edge. Narrowing the gutter to 1rem narrows the
+     padding with it and buys back 16px of content width at 320px. */
+  .management-tabs {
+    padding: 0.5rem;
+  }
+
+  .management-tabs > .row,
+  .tab-content .row {
+    --bs-gutter-x: 1rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+
+  /* Long unbroken values (emails, ticket codes, prize names) must never be the
+     reason a column cannot shrink. */
+  .card-title,
+  .stat-number,
+  .info-value,
+  .badge {
+    overflow-wrap: anywhere;
+  }
+
+  /* A button whose icon already carries the meaning drops its text label where
+     the row is genuinely tight. Only the scanner's search button qualifies —
+     the public header wraps instead, because "Manage" is this app's primary
+     navigation and a bare icon is not a discoverable substitute for it. */
+  .scanner-container .search-input-group .btn .btn-label {
+    display: none;
+  }
+}
+
+/* Notch / home-indicator clearance for the two full-bleed surfaces. */
+.selection-header {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* The insets are a floor under the padding each rule already set, never a
+   replacement for it — dropping the horizontal padding would uncancel the
+   negative margins on every Bootstrap .row inside. */
+.management-tabs {
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767.98px) {
+  .management-tabs {
+    padding-left: max(0.5rem, env(safe-area-inset-left));
+    padding-right: max(0.5rem, env(safe-area-inset-right));
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   2. INPUT MODALITY — touch targets, and hover effects that must not stick
+   ---------------------------------------------------------------------------- */
+
+/* styles.css applies :hover transforms and glows unconditionally. On a touch
+   screen those latch after a tap and stay until the next tap elsewhere, so the
+   card the user just left keeps a "focused" glow. Restrict them to devices that
+   can actually hover; the tap feedback below replaces them on touch. */
+@media (hover: none) {
+  .card:hover,
+  .management-interface .card:hover,
+  .tab-pane .card:hover,
+  #prizesGrid .card:hover,
+  #listsGrid .card:hover,
+  #listsContainer .card:hover,
+  #prizesContainer .card:hover,
+  #settings .card:hover,
+  #lists .card:hover,
+  #prizes .card:hover,
+  .modal-content:hover,
+  .info-card:hover,
+  .container-fluid > .card:hover {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2),
+      0 5px 15px rgba(0, 0, 0, 0.15) !important;
+    border-color: var(--bs-border-color) !important;
+  }
+
+  .btn:hover,
+  .btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15),
+      0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .nav-tabs .nav-link:hover {
+    transform: none;
+    background: transparent;
+    color: #6c757d;
+  }
+
+  .nav-tabs .nav-link:hover i,
+  .list-card-selectable:hover::before,
+  .theme-preset:hover {
+    transform: none;
+    opacity: 0;
+  }
+
+  .theme-preset:hover {
+    opacity: 1;
+  }
+
+  .big-play-button:hover {
+    transform: none;
+    box-shadow: 0 20px 40px rgba(238, 90, 36, 0.4),
+      0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Touch feedback that hover used to provide. */
+  .btn:active,
+  .card.list-card-selectable:active,
+  .card.prize-card:active {
+    transform: scale(0.985);
+  }
+}
+
+/* Comfortable targets on any coarse pointer, at every width — a tablet in
+   landscape is still a finger. 44px is the Apple/Android guideline and clears
+   WCAG 2.5.8 with room to spare. */
+@media (pointer: coarse) {
+  .btn,
+  .form-control,
+  .form-select,
+  .input-group > .btn,
+  .dropdown-item,
+  .nav-tabs .nav-link {
+    min-height: 44px;
+  }
+
+  /* Icon-only buttons have no text to give them width; .btn-close is sized from
+     its background image alone, so it needs both dimensions. */
+  .btn:has(> i:only-child),
+  .btn-close {
+    min-width: 44px;
+  }
+
+  .btn-close {
+    min-height: 44px;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+  }
+
+  /* Checkboxes and radios: grow the control, and make the label — which is what
+     a finger actually hits — 44px tall. The label stays a block, not a flex
+     container: flex would swallow the whitespace between the inline spans some
+     of these labels are built from ("List name" + "(240)").
+     The input's margin-top keeps it centred on the label's first line. */
+  .form-check {
+    padding-left: 2.25rem;
+  }
+
+  .form-check .form-check-input {
+    width: 1.5em;
+    height: 1.5em;
+    margin-left: -2.25rem;
+    margin-top: 0.55rem;
+  }
+
+  .form-check .form-check-label {
+    display: block;
+    min-height: 44px;
+    padding: 0.55rem 0;
+  }
+
+  .form-check .form-text {
+    margin-top: 0;
+  }
+
+  /* The `-sm` variants exist to save room on a mouse-driven console; on a finger
+     they still have to clear 44px. Cards are full width and tables are stacked
+     below md, so there is room for it. */
+  .btn-group-sm > .btn,
+  .btn-sm {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Sortable table headers are click targets too. */
+  .sortable-header {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  /* The scanner header rolls its own button class, so the .btn rules above miss
+     it. Its 48px bar has room for a 44px target. */
+  .header-btn {
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   3. PUBLIC SELECTION SCREEN
+   The stage is locked to the viewport height so nothing scrolls during a show.
+   On a short phone that clipped the play button off the bottom with no way to
+   reach it, so below md the stage scrolls when its content does not fit.
+   ---------------------------------------------------------------------------- */
+
+/* Mobile browser chrome makes 100vh taller than the visible area; dvh tracks the
+   real one. Declared after the vh rule in styles.css so it simply wins where
+   supported. */
+.public-selection-interface {
+  min-height: 100dvh;
+  height: 100dvh;
+}
+
+@media (max-width: 767.98px) {
+  .public-selection-interface {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .display-stage {
+    min-height: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  .selection-header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    padding-top: max(0.6rem, env(safe-area-inset-top));
+  }
+
+  .selection-header > .d-flex.gap-2 {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  /* Prize name in the header gets the full width once the buttons wrap. */
+  .prize-display-header {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .prize-name-header {
+    font-size: 1.15rem;
+  }
+
+  .selection-main {
+    padding: 1rem 0.5rem 2rem;
+  }
+
+  .selection-controls {
+    padding: 1.5rem 1rem;
+    border-radius: 16px;
+  }
+
+  .selection-title {
+    font-size: clamp(1.5rem, 8vw, 2rem);
+    margin-bottom: 0.5rem;
+  }
+
+  .selection-subtitle {
+    font-size: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .selection-info {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .info-card {
+    padding: 0.6rem;
+  }
+
+  .info-label {
+    font-size: 0.75rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .info-value {
+    font-size: 0.95rem;
+  }
+
+  /* One fluid size across every phone width, replacing the 768px/480px pair
+     that used to step it from 150px to 120px. */
+  .big-play-button {
+    width: clamp(112px, 34vw, 160px);
+    height: clamp(112px, 34vw, 160px);
+    font-size: clamp(2rem, 12vw, 3rem);
+    margin: 1rem auto 0;
+  }
+
+  /* The winners grid is sized off the viewport for the big screen; on a phone
+     let it take the height it needs inside the now-scrollable stage. */
+  .winners-grid {
+    height: auto;
+    min-height: 50vh;
+    width: 100%;
+  }
+
+  .winner-card {
+    width: 100%;
+  }
+
+  /* Keyboard shortcuts are a desktop affordance; the badge only covers content
+     on a phone. */
+  .keyboard-help-indicator {
+    display: none;
+  }
+}
+
+/* ---- Winner grid on a phone-width screen ----------------------------------
+   styles.css picks a column count per winner count for a projector: 3 across for
+   5-6 winners, 12 across for 100+. At 320px that gives ~100px columns, and the
+   name font floors at 1.2rem, so surnames were breaking mid-word ("Aber nathy").
+   Halve the column counts and let rows size to their content — the stage scrolls
+   on a phone now, so a taller grid is not a clipped grid.
+
+   Each selector mirrors its counterpart in styles.css exactly: the :has() column
+   rules there carry high specificity, and an override written any other way (the
+   old `@media (max-width: 480px) .winners-grid` rule, for one) silently loses. */
+@media (max-width: 575.98px) {
+  .winners-grid:has(.winner-card:nth-child(1):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(3):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(4):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(5):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(6):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(7):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(8):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(9):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(10):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(11):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)),
+  .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)),
+  .winners-grid:has(.winner-card:nth-child(n+50):nth-child(-n+99)),
+  .winners-grid:has(.winner-card:nth-child(n+100)) {
+    grid-template-rows: none;
+    grid-auto-rows: minmax(6.5rem, auto);
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    width: 100%;
+  }
+
+  /* One card: keep it big. */
+  .winners-grid:has(.winner-card:nth-child(1):nth-last-child(1)) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(11rem, auto);
+  }
+
+  /* Up to twelve: two across. A 320px screen gives ~145px columns, which is what
+     the name sizes below are tuned against. */
+  .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(3):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(4):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(5):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(6):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(7):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(8):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(9):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(10):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(11):nth-last-child(1)),
+  .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(n+50):nth-child(-n+99)) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  /* Mirrors the tie-breaking qualifier styles.css needs at 100+ (the 50-99
+     selector also matches there and would otherwise out-specify this one). */
+  .winners-grid:has(.winner-card:nth-child(n+50):nth-child(-n+99)):has(.winner-card:nth-child(n+100)) {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  /* The name sizes clamp to a floor meant for a projector — at phone column
+     widths that floor is wider than the column, which is what was snapping
+     surnames in half ("Riverw alk"). Lower each floor to match the narrower
+     column. Selectors mirror their counterparts in styles.css exactly so they
+     win on order rather than by accident of specificity. */
+  .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(3):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(4):nth-last-child(1)) .winner-info2 {
+    font-size: calc(var(--winner-name-scale, 1) * clamp(1.1rem, 9cqw, 2.8rem));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(5):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(6):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(7):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(8):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(9):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(10):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(11):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)) .winner-info2 {
+    font-size: calc(var(--winner-name-scale, 1) * clamp(1rem, 8cqw, 2rem));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)) .winner-info2 {
+    font-size: calc(var(--winner-name-scale, 1) * clamp(0.8rem, 7cqw, 1.7rem));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)) .winner-info2 {
+    font-size: calc(var(--winner-name-scale, 1) * clamp(0.7rem, 6cqw, 1.4rem));
+  }
+}
+
+/* Landscape phones are short, not narrow — the play button has to stay in view. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .selection-controls {
+    padding: 1rem 1.5rem;
+  }
+
+  .selection-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .selection-subtitle {
+    display: none;
+  }
+
+  .selection-info {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 0.75rem;
+  }
+
+  .big-play-button {
+    width: 88px;
+    height: 88px;
+    font-size: 2rem;
+    margin: 0.5rem auto 0;
+  }
+}
+
+/* The confetti/coin canvas is fixed to the viewport. Sizing it with `width:100%`
+   made it inherit any horizontal overflow the page had and become an overflow
+   source of its own; insetting it to 0 pins it to the viewport by construction. */
+#animationCanvas {
+  right: 0;
+  bottom: 0;
+  width: auto;
+  height: auto;
+}
+
+/* ----------------------------------------------------------------------------
+   4. MANAGEMENT CHROME — page header and the tab strip
+   ---------------------------------------------------------------------------- */
+
+/* The header packs a title and three controls into one non-wrapping row, which
+   pushed "Public View" off the right edge below ~420px. */
+.management-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.management-header .management-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-left: auto;
+}
+
+@media (max-width: 575.98px) {
+  .management-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .management-header .management-header-actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Tab strip: styles.css already intends a horizontal scroller below md
+   (`overflow-x: auto; white-space: nowrap`) but Bootstrap's `.nav` sets
+   `flex-wrap: wrap`, so the strip wrapped to three rows instead of scrolling.
+   Hold it to one row, snap it, hide the scrollbar and fade the edges so the
+   overflow is visible without a bar. */
+@media (max-width: 767.98px) {
+  .nav-tabs {
+    flex-wrap: nowrap;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    margin-bottom: 1rem;
+    /* Fade the two edges to signal there is more in either direction. */
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    /* Sticky so navigation is always one tap away in a long tab. */
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background-color: var(--bs-body-bg, #ffffff);
+  }
+
+  /* The strip is sticky, so anything scrolled to by the browser (a focused field,
+     scrollIntoView, an in-page anchor) must stop below it instead of under it. */
+  html {
+    scroll-padding-top: 4.5rem;
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Flex spacers as wide as the fade at each end of the scroll track, so the
+     first and last tabs are never sitting under the gradient when the strip is
+     scrolled fully one way. (Padding on a flex scroll container is not reliably
+     included in the scrollable area; a flex item always is.) */
+  .nav-tabs::before,
+  .nav-tabs::after {
+    content: '';
+    flex: 0 0 12px;
+  }
+
+  .nav-tabs .nav-item {
+    scroll-snap-align: center;
+  }
+
+  .nav-tabs .nav-link {
+    flex: 0 0 auto;
+  }
+
+  /* scale(1.05) on the active pill clips inside a scroller and drags the
+     snap point off-centre. */
+  .nav-tabs .nav-link.active {
+    transform: none;
+    animation: none;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   5. SECTION TOOLBARS — the "<title> <sort> <actions>" row on every tab
+   These were `d-flex justify-content-between align-items-center` with no wrap,
+   which is what pushed Select All / Clear All / Add off-screen on Lists and
+   Prizes. One component class replaces the same broken row in five places.
+   ---------------------------------------------------------------------------- */
+
+.section-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-toolbar > .section-toolbar-title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Everything that is not the title groups to the right on a wide screen. */
+.section-toolbar > .section-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767.98px) {
+  .section-toolbar {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* Title owns the first row; each control group gets a full row under it so
+     nothing is ever pushed past the edge. */
+  .section-toolbar > .section-toolbar-title {
+    flex: 1 1 100%;
+  }
+
+  /* `.section-toolbar-sort` is listed alongside `.dropdown` so the rule holds whether the class
+     sits on the dropdown itself (which is how the Svelte screens do it) or on a wrapper. */
+  .section-toolbar > .section-toolbar-group,
+  .section-toolbar > .section-toolbar-sort,
+  .section-toolbar > .btn-group,
+  .section-toolbar > .dropdown,
+  .section-toolbar > .btn {
+    flex: 1 1 100%;
+  }
+
+  /* Sort pills split the row evenly instead of overflowing it. */
+  .section-toolbar .btn-group {
+    width: 100%;
+  }
+
+  .section-toolbar .btn-group > .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+  }
+
+  /* Inside the actions group the same rule applies one level down: the bulk
+     button pair takes a row, the Add dropdown takes the next. */
+  .section-toolbar > .section-toolbar-group > .btn-group,
+  .section-toolbar > .section-toolbar-group > .dropdown {
+    flex: 1 1 100%;
+  }
+
+  /* A toolbar dropdown owns its row, so its trigger fills it rather than sitting
+     as a lone small button against the left edge. */
+  .section-toolbar .dropdown > .dropdown-toggle {
+    width: 100%;
+  }
+
+  .section-toolbar .dropdown-menu {
+    width: 100%;
+  }
+
+  .section-toolbar-sort .dropdown-item {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   6. LIST & PRIZE CARDS
+   ---------------------------------------------------------------------------- */
+
+/* The card header used a hardcoded `max-width` in a style attribute to make the
+   title truncate; that is a fixed width in a fluid card. Truncation only needs
+   the flex item to be allowed to shrink. */
+.list-card-selectable .card-title,
+.prize-card .card-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.list-card-selectable .card-header > .d-flex > div:last-child,
+.prize-card .card-header > .d-flex > div:last-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+  /* The action drawer hides three buttons behind a chevron to save room on a
+     desktop card. A phone card is full width, and a hidden affordance is worse
+     on touch than one more visible button — so show every action, on its own
+     row under the Select button. */
+  .list-card-drawer {
+    max-width: none;
+    opacity: 1;
+    overflow: visible;
+    /* The drawer is always open here, so its buttons must be back in the tab order — styles.css
+       hides them by default precisely so a collapsed drawer cannot be focused. */
+    visibility: visible;
+  }
+
+  .list-card-toggle {
+    display: none;
+  }
+
+  /* One row of equal-width actions across the card: the two groups share the
+     width so five buttons at the 44px touch minimum still fit a 320px screen
+     instead of spilling onto a second line mid-group. */
+  .list-card-actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* flex-basis stays `auto` so each group keeps a width proportional to how many
+     buttons it holds; the spare width is then shared, which keeps every button
+     at or above the 44px minimum set for coarse pointers. */
+  .list-card-actions > .list-card-drawer,
+  .list-card-actions > .btn-group,
+  .list-card-drawer > .btn-group {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .list-card-actions .btn-group > .btn {
+    flex: 1 1 auto;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+  }
+
+  .list-card-drawer.open .btn-group > .btn:last-child {
+    border-top-right-radius: var(--bs-border-radius);
+    border-bottom-right-radius: var(--bs-border-radius);
+  }
+
+  .list-card-view,
+  .list-card-sync {
+    width: auto;
+  }
+
+  /* The 120px floor exists to line up action rows across a three-across desktop
+     grid. One card per row on a phone, so it only adds dead space. */
+  #listsGrid .card .card-body,
+  #prizesGrid .card .card-body,
+  #listsContainer .card .card-body,
+  #prizesContainer .card .card-body {
+    min-height: 0;
+  }
+
+  #listsGrid .card-body > .mt-auto > .d-flex,
+  #prizesGrid .card-body > .mt-auto > .d-flex {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  #listsGrid .card-body > .mt-auto > .d-flex > .btn,
+  #prizesGrid .card-body > .mt-auto > .d-flex > .btn {
+    flex: 1 1 100%;
+  }
+
+  #prizesGrid .card-body > .mt-auto > .d-flex > .btn-group {
+    flex: 1 1 100%;
+  }
+
+  #prizesGrid .card-body > .mt-auto > .d-flex > .btn-group > .btn {
+    flex: 1 1 0;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   7. DATA TABLES → STACKED CARDS
+   A .table-responsive scroller hides half the columns of the Winners, History
+   and Queries tables behind a gesture with no affordance, and the row actions
+   are the columns that end up off-screen. Below md each row becomes a card with
+   its column name as the label. The markup carries explicit ARIA roles so the
+   table semantics survive `display: block`.
+   ---------------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .table-responsive:has(> .table-stack) {
+    overflow-x: visible;
+  }
+
+  .table-stack {
+    display: block;
+    --bs-table-bg: transparent;
+  }
+
+  /* Visually hidden, still in the accessibility tree so the column names remain
+     available. `display: block` is load-bearing: `overflow` has no effect on a
+     table-header-group, so without it the header cells kept their full width and
+     pushed the page sideways even though nothing was visible. */
+  .table-stack > thead {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table-stack tbody,
+  .table-stack tr,
+  .table-stack td {
+    display: block;
+    width: auto;
+  }
+
+  .table-stack > tbody > tr {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: var(--bs-border-radius, 0.375rem);
+    padding: 0.25rem 0.75rem 0.5rem;
+    margin-bottom: 0.75rem;
+    background: var(--bs-card-bg, #fff);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Bootstrap's striping paints cells; on a card the row is the surface. */
+  .table-stack.table-striped > tbody > tr > * {
+    --bs-table-accent-bg: transparent;
+    box-shadow: none;
+  }
+
+  .table-stack > tbody > tr > td {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: baseline;
+    /* Badges and ID pills are grid items here; without this they stretch to the
+       full column and read as banners rather than as values. */
+    justify-items: start;
+    padding: 0.4rem 0;
+    border: 0;
+    border-bottom: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.08));
+    overflow-wrap: anywhere;
+  }
+
+  .table-stack > tbody > tr > td:last-child {
+    border-bottom: 0;
+  }
+
+  .table-stack > tbody > tr > td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--bs-secondary-color, #6c757d);
+    font-size: 0.85em;
+  }
+
+  /* The actions cell has no label, so it spans the card. A group of actions
+     fills the width; a lone destructive button stays right-aligned rather than
+     becoming a full-width red bar. */
+  .table-stack > tbody > tr > td[data-label=""] {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: end;
+    padding-top: 0.6rem;
+  }
+
+  .table-stack > tbody > tr > td[data-label=""] .btn-group {
+    width: 100%;
+  }
+
+  .table-stack > tbody > tr > td[data-label=""] .btn-group > .btn {
+    flex: 1 1 0;
+  }
+
+  /* The "no rows" row must not be dressed up as a record card. */
+  .table-stack > tbody > tr.table-stack-empty {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .table-stack > tbody > tr.table-stack-empty > td {
+    display: block;
+    border-bottom: 0;
+  }
+
+  .table-stack > tbody > tr.table-stack-empty > td::before {
+    content: none;
+  }
+
+  .winner-id-badge {
+    width: auto;
+    min-width: 6rem;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   8. HISTORY STATISTICS
+   `repeat(2, 1fr)` forced two columns at every width, and `1fr` cannot shrink
+   below its content: a long prize name at 2.5rem set a min-content width wider
+   than half the card, so the grid overflowed. minmax(0, …) lets it shrink and
+   the type scales with the box.
+   ---------------------------------------------------------------------------- */
+
+.history-stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+}
+
+.stat-card {
+  min-width: 0;
+}
+
+.stat-number {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767.98px) {
+  .history-stats {
+    grid-template-columns: repeat(auto-fit, minmax(min(8.5rem, 100%), 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    padding: 1rem 0.75rem;
+  }
+
+  .stat-number {
+    font-size: clamp(1.25rem, 6vw, 2rem);
+    line-height: 1.15;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   9. FORMS, WIZARD AND MODALS
+   ---------------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  /* Theme presets: three across at 320px truncates the label. */
+  #settings .theme-preset {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  #settings .color-input {
+    height: 48px;
+  }
+
+  /* Sound rows: name and filename must be allowed to truncate, not push the
+     play/delete buttons out of the card. */
+  #soundFilesList > div {
+    gap: 0.75rem;
+  }
+
+  #soundFilesList > div > div:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* The wizard's five step labels do not fit across a phone; the circles carry
+     the progress and the current step is named by its own heading. */
+  .wizard-step-label {
+    display: none;
+  }
+
+  .wizard-progress-line,
+  .wizard-progress-line-active {
+    top: 16px;
+  }
+
+  .wizard-navigation {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .wizard-navigation > .d-flex {
+    flex: 1 1 100%;
+  }
+
+  .wizard-navigation > .d-flex > .btn {
+    flex: 1 1 0;
+  }
+
+  /* Each query parameter becomes a stacked block; a rule separates one from the
+     next now that they no longer read as table rows. */
+  .query-param-row + .query-param-row {
+    border-top: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.08));
+    padding-top: 0.75rem;
+  }
+
+  /* Bootstrap's .modal-fullscreen-sm-down (added in the markup) turns dialogs
+     into sheets; keep the footer reachable without scrolling past the form. */
+  .modal-fullscreen-sm-down .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bs-modal-bg, #fff);
+    z-index: 1;
+  }
+
+  .modal-fullscreen-sm-down .modal-footer > .btn {
+    flex: 1 1 0;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   10. TOASTS
+   UI.showToast switches Toastify to top/centre on a phone (see ui.js — the
+   bottom-right corner is where the primary action lives). This sizes the toast
+   to the narrow screen and keeps it clear of the notch.
+   ---------------------------------------------------------------------------- */
+
+/* A toast is a notification, not a control: nothing in this app attaches a click
+   handler to one, yet it still sits above the UI and absorbs whatever tap lands
+   on it — the play button, a card's Select, the Manage button. Let taps through.
+   (Not width-scoped: the same swallowed click happens with a mouse.) */
+.toastify {
+  pointer-events: none;
+}
+
+/* Should a toast ever be given its own close button, that part stays tappable. */
+.toastify .toast-close {
+  pointer-events: auto;
+}
+
+@media (max-width: 767.98px) {
+  .toastify.on {
+    max-width: calc(100vw - 1.5rem);
+    margin-top: env(safe-area-inset-top);
+    text-align: center;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   11. MOTION
+   ---------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-tabs .nav-link.active {
+    animation: none;
+  }
+
+  .list-card-selectable.selected {
+    animation: none;
+  }
+
+  .card,
+  .btn,
+  .nav-tabs .nav-link,
+  .list-card-drawer,
+  .list-card-view,
+  .list-card-sync {
+    transition: none !important;
+  }
+
+  /* A winner card starts at `opacity: 0` and is brought in by whichever display-effect
+     animation the operator chose. Dropping the animation on its own would therefore leave the
+     grid empty rather than still — the cards go straight to their final state instead.
+
+     The placeholder rule is restated because the stable grid puts `.winner-card` on those too,
+     and this layer loads after styles.css, so the rule above would otherwise reveal them. */
+  .winner-card.fade-in,
+  .winner-card.fly-in,
+  .winner-card.zoom-in,
+  .winner-card.slide-in,
+  .winner-card.bounce-in {
+    animation: none;
+    opacity: 1;
+  }
+
+  .winner-card.winner-card-placeholder {
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   12. Toast placement
+   --------------------------------------------------------------------------
+   Replaces the Toastify rules in §10 now that toasts are in-app. Same reasoning:
+   on a phone the bottom of the screen is where the primary action lives — the
+   big play button, a card's Select, a modal's Save — so notifications go to the
+   top instead of landing on top of them.
+   ========================================================================== */
+
+@media (max-width: 767.98px) {
+  .app-toasts {
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: auto;
+    top: max(0.75rem, env(safe-area-inset-top));
+    align-items: stretch;
+    max-width: none;
+  }
+
+  .app-toast {
+    justify-content: flex-start;
+  }
+}
+
+/* ==========================================================================
+   13. Prize conditions page
+   --------------------------------------------------------------------------
+   The one media query conditions.html carried, moved here with the rest of its
+   CSS (the base rules are in styles.css under "PRIZE CONDITIONS PAGE").
+
+   It keeps its 600px edge rather than snapping to the 575.98px `sm` boundary
+   the rest of this file uses: the breakpoint is content-driven — the card is
+   700px wide, and 600px is where its 30px side padding starts eating the
+   requirement text — not a device class. Snapping it would be a silent
+   behaviour change to a page nobody would think to re-check.
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  .conditions-header h1 {
+    font-size: 2em;
+  }
+
+  .conditions-header .subtitle {
+    font-size: 1em;
+  }
+
+  .conditions-content {
+    padding: 30px 20px;
+  }
+
+  .conditions-page .requirement-text {
+    font-size: 1em;
+  }
+}
