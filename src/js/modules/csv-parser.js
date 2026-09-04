@@ -9,6 +9,7 @@ import { DOMUtils } from './dom-utils.js';
 import eventManager from './event-manager.js';
 import { settings, Settings } from './settings.js';
 import { Validation } from './validation.js';
+import { SafeHTML } from './safe-html.js';
 
 let pendingCSVData = null;
 
@@ -197,21 +198,45 @@ function showCSVPreview(data, listName) {
   }
 
   const headers = Object.keys(data[0]);
-
-  previewHeaders.innerHTML = '<tr>' +
-    headers.map(header => `<th>${header}</th>`).join('') +
-    '</tr>';
-
   const previewData = data.slice(0, 10);
 
-  previewBody.innerHTML = previewData.map(row =>
-    '<tr>' +
-    headers.map(header => `<td>${row[header] || ''}</td>`).join('') +
-    '</tr>'
-  ).join('');
+  // Built as DOM nodes rather than an innerHTML template: the headers and values
+  // come straight from an uploaded file, so interpolating them into markup would
+  // execute whatever the file contains. `data-label` carries the column name for
+  // the stacked-card layout the responsive stylesheet applies below the md
+  // breakpoint (see .table-stack).
+  // The explicit row/cell roles keep the table semantics once .table-stack
+  // switches these elements to display:block on a phone.
+  const headerRow = SafeHTML.createElement('tr', '', { role: 'row' });
+  headers.forEach(header => {
+    headerRow.appendChild(SafeHTML.createElement('th', header, { scope: 'col', role: 'columnheader' }));
+  });
+  previewHeaders.replaceChildren(headerRow);
 
+  const body = document.createDocumentFragment();
+  previewData.forEach(row => {
+    const tr = SafeHTML.createElement('tr', '', { role: 'row' });
+    headers.forEach(header => {
+      tr.appendChild(SafeHTML.createElement('td', String(row[header] ?? ''), {
+        role: 'cell',
+        'data-label': header
+      }));
+    });
+    body.appendChild(tr);
+  });
+  previewBody.replaceChildren(body);
+
+  // Same reason as the table above: listName is derived from the uploaded
+  // filename, so it is set as text, never interpolated into markup.
   const previewTitle = document.querySelector('#dataPreviewCard .card-title');
-  previewTitle.innerHTML = `Data Preview - <span class="list-name">"${listName}"</span> <span class="list-count">(${data.length} total records, showing first ${previewData.length})</span>`;
+  previewTitle.replaceChildren(
+    document.createTextNode('Data Preview - '),
+    SafeHTML.createElement('span', `"${listName}"`, { className: 'list-name' }),
+    document.createTextNode(' '),
+    SafeHTML.createElement('span',
+      `(${data.length} total records, showing first ${previewData.length})`,
+      { className: 'list-count' })
+  );
 
   // Set the list name in the input field
   const listNameInput = document.getElementById('listName');
