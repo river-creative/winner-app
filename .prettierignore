@@ -1,0 +1,42 @@
+# Prettier governs the code this migration owns: src/lib, src/routes, and the root config files.
+# Everything below is either generated, or hand-maintained prose and CSS that predates it — and
+# reformatting those wholesale would bury real changes in diffs nobody can review.
+
+# Build output and dependencies
+node_modules
+dist
+.svelte-kit
+build
+
+# Generated backend JavaScript (compiled from the .ts sources)
+backend/**/*.js
+backend/**/*.js.map
+
+# The Express backend keeps the formatting it was written with. It was not part of the Svelte
+# migration, and reformatting fifteen files wholesale would bury the handful of real changes made
+# to it. Same reasoning as its ESLint exemption in eslint.config.js.
+backend/**/*.ts
+tsconfig.backend.json
+nodemon.json
+
+# The design system. styles.css and responsive.css are hand-maintained, heavily sectioned, and
+# responsive.css in particular documents *why* each rule exists — Prettier would reflow all of it
+# and the comments would stop lining up with the rules they explain.
+src/css
+
+# Runtime data and lockfiles
+data
+pnpm-lock.yaml
+
+# Prose, notes and plans — written for people, wrapped by hand
+*.md
+docs
+tasks
+dev
+.claude
+
+# Standalone helpers and config that predate this setup
+test-console.cjs
+test-texting.html
+public/manifest.json
+docker-compose.yml

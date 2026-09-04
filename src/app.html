@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover lets the public display and the scanner console reach under the
+         notch on phones; the safe-area insets that keep content clear of it live in app.css. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="description" content="Professional random winner selection application" />
+
+    <link rel="icon" type="image/x-icon" href="%sveltekit.assets%/favicon.ico" />
+    <!-- No manifest link and no service worker on purpose. Both were removed in 34b8b7b
+         ("no worker") because the cached shell kept serving a stale build; the backend still
+         sends no-store on every HTML response to finish the job. public/manifest.json is left
+         orphaned rather than deleted. Do not re-link it without restoring a worker too. -->
+
+    <!-- The five families the theme picker offers. Loaded from Google's CDN, which the CSP in
+         backend/middleware.ts already allows for both the stylesheet and the font files. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Lato:wght@300;400;700&family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    %sveltekit.head%
+
+    <!-- Paint the saved theme before the first frame. Without this the app renders light and
+         then flips to dark on hydration, which is a visible flash on the operator console.
+         Kept inline and dependency-free so it cannot be deferred behind the bundle. -->
+    <script>
+      try {
+        // 'theme' is the key the scanner page has always used; the console never persisted its
+        // toggle at all. One key now serves both.
+        var theme = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    </script>
+  </head>
+  <body data-sveltekit-preload-data="hover">
+    <div style="display: contents">%sveltekit.body%</div>
+  </body>
+</html>

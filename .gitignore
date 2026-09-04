@@ -19,6 +19,7 @@ backend/**/*.map
 !backend/*.ts
 !backend/**/*.ts
 
-# SvelteKit build output
-svelte/build/
-svelte/.svelte-kit/
+# SvelteKit build output. The app moved to the repo root in the Svelte 5 migration, so these are
+# root-level now; `dist/` above is where adapter-static writes the site Express serves.
+.svelte-kit/
+build/
