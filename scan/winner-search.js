@@ -167,13 +167,24 @@ export class WinnerSearch {
    * Returns { type: 'ticketCode' | 'name', results: ... }
    */
   static async search(input) {
-    if (this.isTicketCode(input)) {
-      const result = await this.findByTicketCode(input);
-      return { type: 'ticketCode', result };
-    } else {
+    if (!this.isTicketCode(input)) {
       const results = await this.findByName(input);
       return { type: 'name', results };
     }
+
+    const result = await this.findByTicketCode(input);
+    if (result) return { type: 'ticketCode', result };
+
+    // A surname is shaped exactly like a ticket code — "Whitmore", "Okonkwo" and
+    // "Delacroix" all satisfy isTicketCode()'s 8-24 alphanumeric rule — so a
+    // typed name used to be looked up as a code, miss, and tell the operator
+    // there was no such winner. A miss now falls through to a name search; only
+    // when that misses too is it really "no winner", and the ticketCode type is
+    // kept so the alert still quotes what was scanned.
+    const byName = await this.findByName(input);
+    if (byName.length > 0) return { type: 'name', results: byName };
+
+    return { type: 'ticketCode', result: null };
   }
 
   /**
