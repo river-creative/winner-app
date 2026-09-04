@@ -310,5 +310,30 @@
         "startDate"
       ]
     }
+  },
+  {
+    "id": "mens-checked-in",
+    "name": "Men's Checked In",
+    "description": "Get participants 18+ for specific event(s)",
+    "table": "Event_Participants",
+    "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+    "filter": "Event_ID IN ({{eventId}}) AND \n(Participation_Status_ID = 3 OR Participation_Status_ID = 4) AND\nParticipant_ID_Table_Contact_ID_Table.Gender_ID = 1 AND\nParticipant_ID_Table_Contact_ID_Table.Date_of_Birth <= DATEADD(YEAR, -18, GETDATE())",
+    "params": {
+      "eventId": {
+        "type": "number",
+        "label": "Event ID(s)",
+        "required": true
+      }
+    },
+    "metadata": {
+      "category": "Search Events",
+      "previewFields": [
+        "idCard",
+        "firstName",
+        "lastName",
+        "timeIn"
+      ]
+    },
+    "category": "Search Events"
   }
 ]
