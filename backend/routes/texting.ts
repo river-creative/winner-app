@@ -46,10 +46,13 @@ textingRouter.post('/texting', strictLimiter, async (req: Request, res: Response
         break;
 
       // New: Process pending jobs manually
-      case 'processQueue':
+      case 'processQueue': {
+        // Braced so the declaration is scoped to this case; without them it is visible to every
+        // later case in the switch, initialised or not.
         const processed = await processQueue();
         result = { processed };
         break;
+      }
 
       // New: Get job statistics
       case 'getJobStats':

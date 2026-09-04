@@ -14,23 +14,43 @@ const allowedOrigins = [
   'http://localhost:3001'
 ];
 
-export const corsMiddleware = cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (same-origin, curl, mobile apps)
-    if (!origin) return callback(null, true);
+/**
+ * CORS, with two rules that the allowlist alone did not cover.
+ *
+ * **Same-origin always passes.** A request whose `Origin` is the host it was sent to is by
+ * definition not cross-origin, and no allowlist should have a say in it. This matters now in a
+ * way it did not before: the frontend is an ES-module bundle, and the browser fetches module
+ * scripts in CORS mode — so every one of the app's own JavaScript chunks arrives carrying an
+ * `Origin` header. Serving the app from any host not spelled out below (a second dev port, a
+ * staging box, an IP address) made every chunk fail and the page render blank, with the only
+ * clue a 500 on an asset that `curl` fetched perfectly.
+ *
+ * **A disallowed origin is refused, not errored.** `callback(null, false)` omits the CORS
+ * headers and lets the browser do the blocking, which is what CORS is. Passing an `Error`
+ * instead turned a probe from an unknown origin into a 500 from the app itself — noise in the
+ * logs, and a misleading status for anything watching them.
+ */
+export const corsMiddleware = cors((req, callback) => {
+  const origin = req.headers.origin;
 
-    const isAllowed = allowedOrigins.some(allowed =>
+  // No origin at all: curl, a server-to-server call, or a plain same-origin navigation.
+  if (!origin) return callback(null, { origin: true, credentials: true });
+
+  const host = req.headers.host;
+  const isSameOrigin =
+    !!host && (origin === `http://${host}` || origin === `https://${host}`);
+
+  const isAllowed =
+    isSameOrigin ||
+    allowedOrigins.some(allowed =>
       allowed instanceof RegExp ? allowed.test(origin) : allowed === origin
     );
 
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked request from origin: ${origin}`);
-      callback(new Error('CORS not allowed'));
-    }
-  },
-  credentials: true
+  if (!isAllowed) {
+    console.warn(`CORS blocked request from origin: ${origin}`);
+  }
+
+  callback(null, { origin: isAllowed, credentials: true });
 });
 
 // Security headers (skip CSP since we have custom one below).
@@ -58,88 +78,10 @@ export const helmetMiddleware = helmet({
 
 // Rate limiters live in ./rate-limits.js — see the note there on why they are not in this file.
 
-// Clean 401 error page HTML
-const authErrorPage = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Authentication Required</title>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #0A4f7B 0%, #5FA1F7 100%);
-      padding: 1rem;
-    }
-    .card {
-      background: white;
-      border-radius: 16px;
-      padding: 2.5rem;
-      max-width: 400px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    }
-    .icon {
-      width: 72px;
-      height: 72px;
-      background: linear-gradient(135deg, #ef4444, #dc2626);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 1.5rem;
-    }
-    .icon svg {
-      width: 36px;
-      height: 36px;
-      fill: white;
-    }
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: #1f2937;
-      margin-bottom: 0.75rem;
-    }
-    p {
-      color: #6b7280;
-      margin-bottom: 1.5rem;
-      line-height: 1.5;
-    }
-    .btn {
-      display: inline-block;
-      background: linear-gradient(135deg, #0A4f7B, #5FA1F7);
-      color: white;
-      text-decoration: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      font-weight: 500;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(10, 79, 123, 0.4);
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div class="icon">
-      <svg viewBox="0 0 24 24"><path d="M12 1C8.676 1 6 3.676 6 7v2H4v14h16V9h-2V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v2H8V7c0-2.276 1.724-4 4-4zm0 10c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>
-    </div>
-    <h1>Authentication Required</h1>
-    <p>Please sign in with your credentials to access this page.</p>
-    <a href="javascript:location.reload()" class="btn">Try Again</a>
-  </div>
-</body>
-</html>`;
+// A styled 401 page used to live here. It was never referenced by any route — page auth
+// redirects to /login and API auth answers JSON — so it was removed rather than left to
+// look like a fallback that exists.
+
 
 // Session-based authentication middleware for API endpoints
 export function sessionAuth(req: Request, res: Response, next: NextFunction) {
