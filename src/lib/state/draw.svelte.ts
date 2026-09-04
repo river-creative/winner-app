@@ -29,6 +29,9 @@ export interface DrawResult {
 /** A shuffle of 20 000 entries takes milliseconds; anything near this is a wedged worker. */
 const SELECTION_TIMEOUT_MS = 30_000;
 
+/** How often the pre-selection delay updates its countdown. Smooth enough, and it always fires. */
+const DELAY_TICK_MS = 50;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -303,20 +306,28 @@ class DrawStore {
     const totalMs = seconds * 1000;
     const startedAt = performance.now();
 
-    // A frame loop rather than one timer per tick: the countdown, the progress bar and the dots
-    // all read the same two numbers, and none of them drift.
+    // An interval, deliberately not `requestAnimationFrame`.
+    //
+    // rAF does not fire at all in a hidden tab — measured at zero frames per second. The delay
+    // and the draw run concurrently, so the winners are already written by this point; a loop
+    // that never advances leaves them committed but never revealed, with no timeout and no way
+    // out but a reload. An operator switching tabs mid-countdown on stage is enough to trigger
+    // it. A timer is throttled while hidden but still fires, so the draw always completes.
+    //
+    // The countdown, the progress bar and the dots all read the same two numbers off the wall
+    // clock rather than counting ticks, so none of them drift when the throttling kicks in.
     await new Promise<void>((resolve) => {
       const step = () => {
         const elapsed = performance.now() - startedAt;
         this.#delayProgress = Math.min(1, elapsed / totalMs);
         this.#delayRemaining = Math.max(0, (totalMs - elapsed) / 1000);
         if (elapsed >= totalMs) {
+          clearInterval(timer);
           resolve();
-          return;
         }
-        requestAnimationFrame(step);
       };
-      requestAnimationFrame(step);
+      const timer = setInterval(step, DELAY_TICK_MS);
+      step();
     });
 
     stopSound();

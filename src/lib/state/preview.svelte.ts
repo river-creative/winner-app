@@ -3,6 +3,9 @@ import type { DelayVisualType } from '$lib/types';
 import { boot } from './boot.svelte';
 import { settings } from './settings.svelte';
 
+/** How often the preview updates. Matches the real delay in draw.svelte.ts. */
+const DELAY_TICK_MS = 50;
+
 /**
  * The Setup screen's Preview and Test buttons.
  *
@@ -46,18 +49,21 @@ class PreviewStore {
     const totalMs = seconds * 1000;
     const startedAt = performance.now();
 
+    // An interval, not `requestAnimationFrame`: rAF does not fire at all in a hidden tab, which
+    // would leave the preview overlay up forever. Same reasoning as the real delay in
+    // draw.svelte.ts, and both read the wall clock so neither drifts under throttling.
     await new Promise<void>((resolve) => {
       const step = () => {
         const elapsed = performance.now() - startedAt;
         this.#progress = Math.min(1, elapsed / totalMs);
         this.#remaining = Math.max(0, (totalMs - elapsed) / 1000);
         if (elapsed >= totalMs) {
+          clearInterval(timer);
           resolve();
-          return;
         }
-        requestAnimationFrame(step);
       };
-      requestAnimationFrame(step);
+      const timer = setInterval(step, DELAY_TICK_MS);
+      step();
     });
 
     this.#delayVisual = null;

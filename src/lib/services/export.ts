@@ -10,7 +10,13 @@ function today(): string {
   return new Date().toISOString().split('T')[0] as string;
 }
 
-/** Hand the browser a file. Revoking on the next frame is enough for every current engine. */
+/**
+ * Hand the browser a file.
+ *
+ * The object URL is revoked on a timer rather than on the next animation frame: rAF does not
+ * fire at all in a hidden tab, and a backup taken from a background tab would hold its blob —
+ * a whole copy of the database — in memory for the life of the page.
+ */
 function download(filename: string, contents: string, mimeType: string): void {
   const blob = new Blob([contents], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -18,7 +24,7 @@ function download(filename: string, contents: string, mimeType: string): void {
   link.href = url;
   link.download = filename;
   link.click();
-  requestAnimationFrame(() => URL.revokeObjectURL(url));
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

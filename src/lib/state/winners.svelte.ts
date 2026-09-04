@@ -232,7 +232,10 @@ class WinnerActionsStore {
 
     const confirmed = await ui.confirm({
       title: isFiltered ? 'Clear Filtered Winners' : 'Clear All Winners',
-      message: isFiltered ? `Delete the ${count} the current filters are showing?` : `Delete all ${count}?`,
+      // "Delete all 1 winner record?" reads as a bug. Only say "all" when there is more than one.
+      message: isFiltered
+        ? `Delete the ${count} the current filters are showing?`
+        : `Delete ${rows.length > 1 ? 'all ' : 'the '}${count}?`,
       details: [
         isFiltered
           ? `${formatNumber(data.winners.length - rows.length)} other winner ${pluralise(data.winners.length - rows.length, 'record')} will be kept.`
