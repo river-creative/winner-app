@@ -22,11 +22,18 @@ function showToast(message, type = 'info') {
     info: '#06b6d4'
   };
 
+  // On a phone the bottom of the screen is where the primary action lives — the
+  // big play button on the public display, Select/Save on every card — and a
+  // toast there both hides it and swallows the tap, because a Toastify toast is
+  // itself clickable. Come down from the top instead. Matched to the same md
+  // breakpoint the responsive stylesheet uses.
+  const isNarrow = window.matchMedia('(max-width: 767.98px)').matches;
+
   Toastify({
     text: message,
     duration: 3000,
-    gravity: 'bottom',
-    position: 'right',
+    gravity: isNarrow ? 'top' : 'bottom',
+    position: isNarrow ? 'center' : 'right',
     style: {
       background: backgroundColor[type] || backgroundColor.info,
     }

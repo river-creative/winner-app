@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- No maximum-scale / user-scalable=no: blocking pinch-zoom fails WCAG 1.4.4,
+       and volunteers running the pickup desk need to be able to zoom a ticket code. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>River Winner - Prize Pickup Scanner</title>
   <!-- Force cache refresh -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -21,6 +23,8 @@
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
   <!-- Custom CSS with cache busting -->
   <link rel="stylesheet" href="/src/css/styles.css?v=20251214">
+  <!-- Responsive layer — must load after styles.css so its rules win ties -->
+  <link rel="stylesheet" href="/src/css/responsive.css?v=20251214">
 </head>
 <body x-data :data-theme="$store.scan.darkMode ? 'dark' : 'light'">
   <!-- Header -->
