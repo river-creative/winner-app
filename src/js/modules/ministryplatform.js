@@ -2,6 +2,7 @@
 import { UI } from './ui.js';
 import { Lists } from './lists.js';
 import { Database } from './database.js';
+import { SafeHTML } from './safe-html.js';
 
 class MinistryPlatformModule {
   constructor() {
@@ -908,38 +909,49 @@ class MinistryPlatformModule {
     const thead = table.querySelector('thead');
     const tbody = table.querySelector('tbody');
     
+    thead.replaceChildren();
+    tbody.replaceChildren();
+
+    // Builds a full-width message row (empty state, truncation notice)
+    const messageRow = (text, colspan) => {
+      const row = SafeHTML.createElement('tr');
+      row.appendChild(SafeHTML.createElement('td', text, {
+        colspan: String(colspan),
+        className: 'text-center text-muted'
+      }));
+      return row;
+    };
+
     if (!data || data.length === 0) {
-      thead.innerHTML = '';
-      tbody.innerHTML = '<tr><td colspan="100%" class="text-center text-muted">No data returned</td></tr>';
+      tbody.appendChild(messageRow('No data returned', '100%'));
       return;
     }
-    
-    // Use specified fields or get all fields from first record
-    const displayFields = fields || Object.keys(data[0]);
-    
+
+    // Use specified fields or get all fields from first record.
+    // An empty array is truthy, so it must be treated as "unspecified" — queries created
+    // through the query editor are seeded with previewFields: [], and falling through with
+    // that would render a table with zero columns.
+    const displayFields = fields?.length ? fields : Object.keys(data[0]);
+
     // Create header
-    thead.innerHTML = `
-      <tr>
-        ${displayFields.map(field => `<th>${field}</th>`).join('')}
-      </tr>
-    `;
-    
-    // Show first 10 records as preview
-    const previewData = data.slice(0, 10);
-    tbody.innerHTML = previewData.map(record => `
-      <tr>
-        ${displayFields.map(field => `<td>${record[field] || ''}</td>`).join('')}
-      </tr>
-    `).join('');
-    
+    const headerRow = SafeHTML.createElement('tr');
+    for (const field of displayFields) {
+      headerRow.appendChild(SafeHTML.createElement('th', field));
+    }
+    thead.appendChild(headerRow);
+
+    // Show first 10 records as preview. Values are rendered as text, never markup —
+    // these come straight from MinistryPlatform and must not be able to inject HTML.
+    // createTableRow only fills a cell it recognises as a string, so numeric columns
+    // (Contact_ID and friends) have to be stringified here or they render blank.
+    const toCellText = (value) => (value === null || value === undefined ? '' : String(value));
+
+    for (const record of data.slice(0, 10)) {
+      tbody.appendChild(SafeHTML.createTableRow(displayFields.map(field => toCellText(record[field]))));
+    }
+
     if (data.length > 10) {
-      tbody.innerHTML += `
-        <tr>
-          <td colspan="${displayFields.length}" class="text-center text-muted">
-            ... and ${data.length - 10} more records
-          </td>
-        </tr>
-      `;
+      tbody.appendChild(messageRow(`... and ${data.length - 10} more records`, displayFields.length));
     }
   }
 
