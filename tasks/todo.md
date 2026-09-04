@@ -1,5 +1,11 @@
 # SvelteKit Migration Plan
 
+> **Superseded by `tasks/svelte5-migration-plan.md`**, which is the plan the migration actually
+> followed. This sketch stops at Phase 1, predates the Alpine migration, the Google sign-in work
+> and `src/css/responsive.css`, and proposes a `/svelte` staging directory that the finished
+> migration did not use (the reasoning is in §3.1 of the newer plan). The Alpine → Svelte 5
+> mapping table at the end is still a useful reference.
+
 ## Overview
 Migrate Winner App from Alpine.js + vanilla JS to SvelteKit with Svelte 5 runes for robust reactive property binding and state management.
 

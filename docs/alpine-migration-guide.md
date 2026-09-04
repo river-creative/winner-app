@@ -1,5 +1,12 @@
 # Alpine.js Migration Guide - Winner App
 
+> **Historical.** Alpine.js was removed in September 2026 when the frontend moved to SvelteKit 2
+> and Svelte 5 runes — see `tasks/svelte5-migration-plan.md`. Nothing here describes the running
+> app any more. It is kept because its "Lessons Learned" section records *why* several patterns
+> existed, and because the store shapes it documents are the reference for what the rune stores
+> had to reproduce.
+
+
 ## Overview
 Incremental migration from vanilla JavaScript to Alpine.js following [official Alpine.js documentation](https://alpinejs.dev/start-here). Priority: Forms & Inputs, then Modals & UI. No HTMX - keep existing fetch-based `database.js`.
 

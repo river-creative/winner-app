@@ -6,10 +6,40 @@
 ## 🏗️ Architecture & Technology Stack
 
 ### Frontend Framework
-- **Vite** build tool for fast development and optimized production builds
-- **Bootstrap 5.3.2** for responsive UI components
-- **Vanilla JavaScript modules** (ES6+) for application logic
-- **Service Worker** for offline functionality and PWA features
+- **SvelteKit 2 + Svelte 5 (runes)** — the whole UI. State lives in rune classes under
+  `src/lib/state/*.svelte.ts`; there is no Alpine.js and no Bootstrap JavaScript.
+- **`adapter-static` in SPA mode** — the build emits `dist/`, which the existing Express server
+  serves exactly as it served the old Vite output. `ssr = false` is set once, in
+  `src/routes/+layout.ts`: every screen depends on browser-only APIs (BarcodeDetector,
+  getUserMedia, AudioContext, Fullscreen, canvas, localStorage), so server rendering would buy
+  nothing and cost a class of hydration bugs.
+- **Bootstrap 5.3 CSS** for the design system, from npm rather than a CDN. Its JavaScript is
+  deliberately absent: modals are native `<dialog>` elements, the tab strip is real routing, and
+  dropdowns are Svelte components. That is what allowed two global monkeypatches the old page
+  carried — a patched `JSON.parse` and a wrapped `document.body.getAttribute` — to be deleted
+  rather than ported.
+- **TypeScript strict**, with `noUncheckedIndexedAccess`, checked by `svelte-check`.
+- **No service worker.** It and the manifest link were removed on purpose in 34b8b7b because the
+  cached shell kept serving a stale build; the backend still sends `no-store` on every HTML
+  response. `public/manifest.json` is left orphaned rather than re-linked.
+
+### Routing
+Every management tab is a real route, so the back button, deep links and refresh all work:
+
+| Path | Screen |
+|---|---|
+| `/` | Setup (list, prize and reveal configuration) |
+| `/lists` · `/prizes` · `/templates` | Data management |
+| `/winners` · `/history` | Records |
+| `/queries` | Ministry Platform saved queries |
+| `/settings` | Theme, display, webhook, sounds |
+| `/present` | The public draw view |
+| `/scan` | Prize-pickup scanner |
+| `/login` · `/conditions` | Public pages, outside the authenticated group |
+
+`/win/*` is legacy. The API still answers there; **page** requests 301 to the canonical path,
+because a client-side router is compiled for exactly one base path and would 404 under a second
+prefix.
 
 ### Backend & Storage
 - **Node.js/Express** backend server
@@ -76,7 +106,7 @@
 - Offline-first with background sync
 - Automatic data persistence
 
-### 8. **QR Scanner Module** (scan.html)
+### 8. **QR Scanner Module** (`/scan`)
 - Camera-based QR code scanning
 - Manual ticket code entry
 - Prize pickup tracking
@@ -94,41 +124,46 @@
 
 ```
 winner-app/
-├── public/
-│   ├── favicon.ico
-│   ├── favicon.png
-│   ├── manifest.json          # PWA manifest
-│   ├── worker.js              # Service Worker
-│   ├── icons/                 # App icons
-│   └── sounds/                # Audio files
+├── public/                    # Static assets, copied into dist by the build
+│   ├── favicon.ico / favicon.png
+│   ├── icons/
+│   ├── sounds/                # The six built-in sound files
+│   └── manifest.json          # Orphaned on purpose — see "No service worker"
 ├── src/
-│   ├── main.js               # Entry point
+│   ├── app.html               # The SPA shell
 │   ├── css/
-│   │   └── styles.css        # Main stylesheet
-│   └── js/
-│       ├── app.js            # Main application logic
-│       ├── scan-app.js       # Scanner app entry
-│       └── modules/
-│           ├── firebase.js    # Firebase config
-│           ├── firestore.js   # Database layer
-│           ├── ui.js         # UI utilities
-│           ├── lists.js      # List management
-│           ├── prizes.js     # Prize management
-│           ├── winners.js    # Winner management
-│           ├── selection.js  # Selection engine
-│           ├── settings.js   # Settings management
-│           ├── sounds.js     # Sound effects
-│           ├── animations.js # Visual effects
-│           ├── csv-parser.js # CSV processing
-│           ├── export.js     # Export/backup
-│           └── qr-scanner.js # QR scanning
-├── docs/                     # Documentation
-├── index.html               # Main app
-├── scan.html               # QR scanner page
-├── test-*.html             # Test pages
-├── package.json            # NPM config
-└── vite.config.js          # Vite build config
+│   │   ├── styles.css         # The design system. NO viewport media queries live here.
+│   │   └── responsive.css     # Every viewport-width rule, loaded last so it wins ties.
+│   ├── lib/
+│   │   ├── api/client.ts      # The only place that talks to the Express API
+│   │   ├── components/        # Shared UI + one folder per feature
+│   │   ├── constants/         # Settings defaults, select options, sort options
+│   │   ├── services/          # Pure logic: eligibility, shuffle, csv, export, sounds, texting
+│   │   ├── state/*.svelte.ts  # Rune stores: settings, data, setup, draw, filters, ui, session
+│   │   ├── types/index.ts     # The domain model — every stored field name
+│   │   ├── utils/             # csv, format, id, persisted
+│   │   └── workers/           # The selection worker
+│   └── routes/
+│       ├── +layout.svelte     # Toasts, dialogs, progress, session overlay
+│       ├── (app)/             # Everything behind sign-in; boots settings + data
+│       │   ├── (console)/     # The management screens, with header and nav
+│       │   ├── present/       # The public draw view
+│       │   └── scan/          # The prize-pickup scanner
+│       ├── login/ conditions/ # Public pages — never make an authenticated call
+│       └── +error.svelte
+├── backend/                   # Express API (TypeScript, compiled in place)
+├── data/                      # JSON collections + uploads (bind-mounted volume)
+├── docs/ · tasks/             # Documentation and plans
+├── svelte.config.js · vite.config.ts · tsconfig.json · eslint.config.js
+└── Dockerfile · docker-compose.yml · deploy.sh
 ```
+
+### The two stylesheets — read this before adding CSS
+`src/css/responsive.css` owns **every** `@media (max-width: …)` rule in the app and loads after
+`styles.css` so it wins ties at equal specificity. `styles.css` keeps the container queries, the
+print rules and the `:has()`-based winners-grid brackets. Putting a viewport rule anywhere else —
+including a component's `<style>` block — is how the tab strip ended up with a scroll rule that
+never took effect. Breakpoints follow Bootstrap 5 exactly.
 
 ## 🚀 Key Implementation Highlights
 
@@ -245,17 +280,30 @@ negative.
 
 ### Development
 ```bash
-npm install        # Install dependencies
-npm run dev        # Start dev server (port 3000)
-npm run build      # Production build
-npm run preview    # Preview production build
+pnpm install       # Install dependencies
+pnpm dev:all       # Backend on 3001 and the Vite dev server on 3000, together
+pnpm dev           # Frontend only (proxies /api and /uploads to the backend)
+pnpm dev:server    # Backend only
+
+pnpm check         # svelte-check: types and accessibility
+pnpm lint          # Prettier + ESLint
+pnpm test          # Vitest
+pnpm build         # vite build → dist/, then tsc → backend/*.js
 ```
 
-### Deployment Options
-- **GitHub Pages**: Free static hosting
-- **Netlify/Vercel**: Automatic deployments
-- **Firebase Hosting**: Integrated with Firestore
-- **Traditional hosting**: Any HTTPS-enabled server
+To run a second checkout alongside the first, set `PORT` in its `.env` and start Vite with
+`BACKEND_PORT=<that port> pnpm dev --port <free port>`. Pick a web port already in the CORS
+allowlist in `backend/middleware.ts` (5173 or 6001), or the browser's `Origin` header will be
+rejected.
+
+### Deployment
+`deploy.sh` rsyncs the tree to `rmi-services:/srv/winner-app` over an IAP tunnel and rebuilds the
+container there; `dist/` is built inside the image and never uploaded. The frontend migration did
+not change any of this — `pnpm build` still emits `dist/`, and the Dockerfile still copies it.
+
+The static hosting the app once targeted (GitHub Pages, Netlify, Firebase) is no longer an option:
+the Express backend owns sessions, the JSON collections, uploads and the Ministry Platform and
+texting integrations.
 
 ## 📊 Testing Pages
 - **test-firestore.html**: Basic Firestore operations testing
@@ -406,11 +454,29 @@ Integrates with the Giveaway Reports API to import attendee lists directly. Fetc
 - **SMS module exports** - Added missing checkAllPendingStatuses export
 - **Domain migration support** - Updated from tickets.revival.com/win to win.revival.com
 
-## 📝 Summary
-The River Winner App has evolved from a Firebase-based PWA to a containerized, self-hosted solution with local data storage. The refactoring removed external dependencies while maintaining all features and improving performance through batch operations and optimized state management. The app is now deployed at win.revival.com with full Docker containerization and nginx reverse proxy configuration.
+## 🚀 Svelte 5 migration (September 2026)
 
-Recent updates focused on UI consistency, fixing selection bugs, and ensuring proper data synchronization across browser sessions. The Lists tab now matches the Prizes page design pattern with click-to-select cards, and all async operations have been properly handled to prevent UI refresh issues.
+The frontend was rewritten from Alpine.js and vanilla ES modules to SvelteKit 2 with Svelte 5
+runes. The backend is unchanged in behaviour; the plan, the parity contract and the full list of
+defects fixed on the way are in `tasks/svelte5-migration-plan.md`.
+
+What changed structurally:
+- 8 Alpine stores declared inline in a 3 700-line `index.html` became typed rune stores in
+  `src/lib/state`; 15 000 lines of untyped ES modules became typed modules in `src/lib/services`.
+- Bootstrap tabs became real routes; Bootstrap modals became native `<dialog>` elements. Removing
+  Bootstrap's JavaScript removed both global monkeypatches the old page needed to survive it.
+- The selection worker is a real module worker that is terminated after each draw, instead of a
+  Blob built from a template string that leaked one worker and one object URL per draw.
+- Eligibility is computed once and shared, so the count shown on Setup is by construction the
+  pool the draw runs against.
+- Settings became one object instead of two half-overlapping ones, which is what made settings
+  backup, `stableGrid` and "turn a checkbox off" work for the first time.
+
+## 📝 Summary
+The River Winner App has evolved from a Firebase-based PWA to a containerized, self-hosted
+solution with local data storage, and its frontend from Alpine.js to Svelte 5. The app is
+deployed at win.revival.com with full Docker containerization behind an nginx reverse proxy.
 
 ---
 *Generated on: November 7, 2024*
-*Last Updated: August 16, 2025 - UI improvements, bug fixes for list selection, and async operation handling*
+*Last Updated: September 4, 2026 — SvelteKit 2 / Svelte 5 runes migration*
