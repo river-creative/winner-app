@@ -929,8 +929,11 @@
     width: 100%;
   }
 
+  /* The menu renders in the top layer, whose containing block is the viewport, so a percentage
+     would size it to the screen rather than to the trigger. Dropdown.svelte publishes the
+     trigger's measured width for exactly this. */
   .section-toolbar .dropdown-menu {
-    width: 100%;
+    width: var(--dropdown-trigger-width, auto);
   }
 
   .section-toolbar-sort .dropdown-item {

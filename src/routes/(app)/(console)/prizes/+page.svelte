@@ -181,7 +181,7 @@
           label=""
           buttonClass="btn btn-outline-secondary btn-sm"
           align="start"
-          menuClass="w-100"
+          menuClass="dropdown-menu-match-trigger"
           ariaLabel="Change how prizes are sorted"
         >
           {#snippet trigger()}

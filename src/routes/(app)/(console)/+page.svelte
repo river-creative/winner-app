@@ -102,7 +102,7 @@
           buttonClass="btn btn-outline-secondary w-100 text-start"
           label=""
           align="start"
-          menuClass="w-100"
+          menuClass="dropdown-menu-match-trigger"
           ariaLabel="Select prize"
         >
           {#snippet trigger()}
