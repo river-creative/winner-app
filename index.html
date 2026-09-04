@@ -225,10 +225,16 @@
                         </template>
                         <p x-show="$store.data.lists.length === 0" class="text-muted mb-0">No lists uploaded yet</p>
                       </div>
-                      <div class="d-flex justify-content-between align-items-center mt-2">
+                      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
                         <div class="list-selection-controls">
-                          <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllLists" @click="$store.setup.selectAllLists()">Select All</button>
-                          <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllLists" @click="$store.setup.clearSelectedLists()">Clear All</button>
+                          <!-- Same single toggle as the Lists tab — one control, one behaviour. -->
+                          <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllLists"
+                                  :aria-pressed="$store.setup.allListsSelected"
+                                  :title="$store.setup.allListsSelected ? 'Clear the list selection' : 'Select every list'"
+                                  @click="$store.setup.toggleSelectAllLists()">
+                            <i class="bi me-1" :class="$store.setup.allListsSelected ? 'bi-square' : 'bi-check-square'"></i>
+                            <span x-text="$store.setup.allListsSelected ? 'Clear All' : 'Select All'"></span>
+                          </button>
                           <span class="ms-2 text-muted" x-text="$store.setup.validSelectedCount + ' selected'"></span>
                         </div>
                         <small class="text-muted">Eligible: <span x-text="$store.setup.eligibleEntries.toLocaleString() + ($store.setup.excludedCount > 0 ? ' (' + $store.setup.excludedCount + ' excluded)' : '')">0</span></small>
@@ -559,10 +565,12 @@
               </template>
               <template x-if="$store.data.lists.length > 0">
                 <div class="dropdown d-md-none section-toolbar-sort">
-                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle w-100" type="button" data-bs-toggle="dropdown"
+                  <!-- No "Sort:" prefix — the direction icon already says what this
+                       is, and the three controls only share one row without it. -->
+                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown"
                           aria-label="Change how lists are sorted">
-                    <i class="bi me-1" :class="$store.lists.sortDir === 'asc' ? 'bi-sort-down' : 'bi-sort-up'"></i>
-                    Sort: <span x-text="$store.sortOptions.labelFor('lists', $store.lists.sortField)"></span>
+                    <i class="bi" :class="$store.lists.sortDir === 'asc' ? 'bi-sort-down' : 'bi-sort-up'"></i>
+                    <span x-text="$store.sortOptions.labelFor('lists', $store.lists.sortField)"></span>
                   </button>
                   <ul class="dropdown-menu w-100">
                     <template x-for="opt in $store.sortOptions.lists" :key="opt.field">
@@ -579,14 +587,19 @@
                 </div>
               </template>
               <div class="section-toolbar-group">
-                <div class="btn-group btn-group-sm" role="group" aria-label="Bulk list selection" x-show="$store.data.lists.length > 0">
-                  <button type="button" class="btn btn-outline-secondary" id="selectAllListsTab" @click="$store.setup.selectAllLists()">
-                    <i class="bi bi-check-square me-1"></i>Select All
+                <!-- One button, both directions: it selects everything, then clears
+                     it once everything is selected. Two buttons could not share a
+                     phone row with the sort control and Add. -->
+                <template x-if="$store.data.lists.length > 0">
+                  <button type="button" class="btn btn-outline-secondary btn-sm section-toolbar-toggle"
+                          id="selectAllListsTab"
+                          :aria-pressed="$store.setup.allListsSelected"
+                          :title="$store.setup.allListsSelected ? 'Clear the list selection' : 'Select every list'"
+                          @click="$store.setup.toggleSelectAllLists()">
+                    <i class="bi" :class="$store.setup.allListsSelected ? 'bi-square' : 'bi-check-square'"></i>
+                    <span x-text="$store.setup.allListsSelected ? 'Clear All' : 'Select All'"></span>
                   </button>
-                  <button type="button" class="btn btn-outline-secondary" id="clearAllListsTab" @click="$store.setup.clearSelectedLists()">
-                    <i class="bi bi-square me-1"></i>Clear All
-                  </button>
-                </div>
+                </template>
                 <div class="dropdown">
                   <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-label="Add a list">
                     <i class="bi bi-plus-circle me-2"></i>Add
@@ -1012,10 +1025,10 @@
               </template>
               <template x-if="$store.data.prizes.length > 0">
                 <div class="dropdown d-md-none section-toolbar-sort">
-                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle w-100" type="button" data-bs-toggle="dropdown"
+                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown"
                           aria-label="Change how prizes are sorted">
-                    <i class="bi me-1" :class="$store.prizes.sortDir === 'asc' ? 'bi-sort-down' : 'bi-sort-up'"></i>
-                    Sort: <span x-text="$store.sortOptions.labelFor('prizes', $store.prizes.sortField)"></span>
+                    <i class="bi" :class="$store.prizes.sortDir === 'asc' ? 'bi-sort-down' : 'bi-sort-up'"></i>
+                    <span x-text="$store.sortOptions.labelFor('prizes', $store.prizes.sortField)"></span>
                   </button>
                   <ul class="dropdown-menu w-100">
                     <template x-for="opt in $store.sortOptions.prizes" :key="opt.field">
@@ -2759,6 +2772,23 @@
         clearSelectedLists() {
           this.selectedListIds = [];
           this.capWinnersCount(); // Cap immediately after list change
+        },
+
+        // Every list selected? Counts only ids that still exist, so a stale id left
+        // in the persisted selection by a deleted list cannot make this read true.
+        get allListsSelected() {
+          const lists = Alpine.store('data')?.lists || [];
+          return lists.length > 0 && this.validSelectedCount === lists.length;
+        },
+
+        // One button for both directions: select everything, or clear it once
+        // everything is selected. Same shape as toggleList() above.
+        toggleSelectAllLists() {
+          if (this.allListsSelected) {
+            this.clearSelectedLists();
+          } else {
+            this.selectAllLists();
+          }
         }
       });
 
