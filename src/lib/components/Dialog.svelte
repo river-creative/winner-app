@@ -58,7 +58,10 @@
     // for reasons of its own, and a version that only acted inside the `open && !dialog.open`
     // branch dropped its bookkeeping on the next re-run and never got it back.
     if (open) {
-      if (!dialog.open) dialog.showModal();
+      if (!dialog.open) {
+        dialog.showModal();
+        focusInitial(dialog);
+      }
       // Nothing outside the top layer can paint above this, so the toast stack and the progress
       // overlay are moved inside it while it is open. See $lib/state/layers.ts.
       adoptOverlays(dialog);
@@ -73,6 +76,25 @@
 
     return () => releaseOverlays(dialog);
   });
+
+  /**
+   * Where the keyboard lands when a dialog opens.
+   *
+   * `showModal()` focuses the first focusable descendant, and in this frame that is always the
+   * close button — so every dialog opened with its × ringed and Enter dismissed it instead of
+   * submitting. An explicit `autofocus` still wins, since `showModal()` has already honoured it.
+   * Otherwise focus goes to the first field the operator opened the dialog to fill in, and to
+   * the panel itself when there is none — a confirmation, say — which leaves a screen reader
+   * announcing the dialog rather than its close button.
+   */
+  function focusInitial(dialog: HTMLDialogElement) {
+    if (dialog.querySelector('[autofocus]')) return;
+
+    const field = dialog.querySelector<HTMLElement>(
+      '.modal-body input:not([type="hidden"]):not([disabled]), .modal-body select:not([disabled]), .modal-body textarea:not([disabled])'
+    );
+    (field ?? dialog.querySelector<HTMLElement>('.modal-content'))?.focus();
+  }
 
   /**
    * Escape. The browser would close the dialog itself, which would take the DOM out of step with
@@ -91,9 +113,17 @@
   }
 </script>
 
+<!--
+  `modal` is carried purely for Bootstrap's `--bs-modal-*` variables, which it declares on that
+  class and which `.modal-content`, `.modal-header`, `.modal-body` and `.modal-footer` all read.
+  Without it every one of them is unset, and `max-width: var(--bs-modal-width)` is then invalid
+  at computed-value time and resolves to `none` — which is why this rendered as a full-viewport
+  form with no panel, no background and no padding around it. Everything `.modal` does beyond
+  the variables is layout this element supplies itself, and styles.css overrides it there.
+-->
 <dialog
   bind:this={element}
-  class="app-dialog"
+  class="app-dialog modal"
   aria-label={title}
   oncancel={handleCancel}
   onclick={handleBackdropClick}
@@ -103,7 +133,9 @@
       ? 'modal-fullscreen-sm-down'
       : ''}"
   >
-    <div class="modal-content">
+    <!-- `tabindex="-1"` so focusInitial can land here when the dialog has no field of its own.
+         It is not a tab stop: only script reaches it. -->
+    <div class="modal-content" tabindex="-1">
       <div class="modal-header">
         <h5 class="modal-title">{title}</h5>
         {#if dismissible}

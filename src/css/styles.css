@@ -617,6 +617,13 @@ body {
      positive magnitude (~half the size) so the badge straddles the card corner at every size. */
   --winner-badge-size: clamp(16px, 4cqw, 35px);
   --winner-badge-offset: clamp(8px, 2cqw, 17px);
+  /* The card owns its text palette so that re-skinning it for a theme is one rule here rather
+     than one per line. The dark theme previously restyled .winner-name and .winner-details,
+     which no markup has used for some time, so the three lines that do exist kept these
+     light-mode greys on a dark card — the winner's name reached the room at 1.66:1. */
+  --winner-text: #333;
+  --winner-text-muted: #555;
+  --winner-text-subtle: #666;
 
   background: rgba(255, 255, 255, 0.95);
   border-radius: clamp(8px, 2vw, 15px);
@@ -820,7 +827,7 @@ body {
 .winner-info1 {
   font-size: clamp(0.25rem, 1.8cqw, 0.9rem);
   font-weight: 500;
-  color: #555;
+  color: var(--winner-text-muted);
   margin-bottom: clamp(0.05rem, 0.5cqw, 0.2rem);
   margin-top: 0;
   line-height: 1.1;
@@ -831,7 +838,7 @@ body {
 .winner-info2 {
   font-size: calc(var(--winner-name-scale, 1) * clamp(1.2rem, 7.5cqw, 2.5rem));
   font-weight: 700;
-  color: #333;
+  color: var(--winner-text);
   margin-bottom: clamp(0.08rem, 0.7cqw, 0.25rem);
   line-height: 1.2;
   word-break: break-word;
@@ -841,7 +848,7 @@ body {
 .winner-info3 {
   font-size: clamp(0.2rem, 1.5cqw, 0.7rem);
   font-weight: 400;
-  color: #666;
+  color: var(--winner-text-subtle);
   line-height: 1.2;
   word-break: break-word;
   hyphens: auto;
@@ -1478,16 +1485,19 @@ body {
   color: #e2e8f0;
 }
 
+/* `background-color`, never the `background` shorthand: the shorthand also resets
+   `background-image`, and on a .form-select that image is the chevron. Every select in the dark
+   theme was drawn as a plain text box with no indication it could be opened. */
 [data-theme="dark"] .form-control,
 [data-theme="dark"] .form-select {
-  background: #334155;
+  background-color: #334155;
   border-color: #475569;
   color: #e2e8f0;
 }
 
 [data-theme="dark"] .form-control:focus,
 [data-theme="dark"] .form-select:focus {
-  background: #334155;
+  background-color: #334155;
   border-color: var(--primary-color);
   color: #e2e8f0;
 }
@@ -1495,14 +1505,12 @@ body {
 [data-theme="dark"] .winner-card {
   background: rgba(30, 41, 59, 0.95);
   color: #e2e8f0;
-}
-
-[data-theme="dark"] .winner-name {
-  color: #e2e8f0;
-}
-
-[data-theme="dark"] .winner-details {
-  color: #94a3b8;
+  /* Retargeted from .winner-name / .winner-details, which no markup has carried since the card
+     moved to the three configurable .winner-info lines. Overriding the card's own tokens keeps
+     this from drifting again: a new line inside the card inherits the theme by default. */
+  --winner-text: #e2e8f0;
+  --winner-text-muted: #cbd5e1;
+  --winner-text-subtle: #94a3b8;
 }
 
 /* Print Styles */
@@ -2235,15 +2243,23 @@ body {
   z-index: 0;
 }
 
+/* Same box as the rail above, filled by a horizontal scale rather than a width.
+   It used to be `left: 50px` with a width given as a percentage of the whole container, but the
+   rail it fills is inset 50px at BOTH ends — so the fill ran 50px past the rail on the last
+   step, out of the dialog body and into a horizontal scrollbar. Sharing the rail's geometry and
+   scaling between 0 and 1 makes overshooting it impossible. */
 .wizard-progress-line-active {
   position: absolute;
   top: 20px;
   left: 50px;
+  right: 50px;
   height: 3px;
   background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
   border-radius: 2px;
   z-index: 1;
-  transition: width 0.4s ease;
+  transform: scaleX(var(--wizard-progress, 0));
+  transform-origin: left center;
+  transition: transform 0.4s ease;
 }
 
 /* A <button>, not a <div>: the rail is the only way back to an earlier step, and a div with a
@@ -3044,10 +3060,27 @@ body {
    existing modal rule — including responsive.css's sticky footer below md and
    .modal-fullscreen-sm-down — keeps applying unchanged.
 
+   That last part only holds because the dialog also carries .modal itself.
+   Bootstrap declares the entire --bs-modal-* set on that class, and the inner
+   classes are nothing but readers of it: dropping .modal left every variable
+   unset, so .modal-content had no background, radius or padding and
+   .modal-dialog's `max-width: var(--bs-modal-width)` resolved to `none`. The
+   panel was a full-viewport form with nothing drawn around it.
+
    The dialog itself is made a full-viewport, transparent box so that
    .modal-dialog-centered can centre inside it exactly as it did inside
-   Bootstrap's .modal wrapper.
+   Bootstrap's .modal wrapper. Everything .modal contributes beyond the
+   variables is layout — and every one of those declarations is overridden
+   below, which the higher specificity of `dialog.app-dialog` handles on its
+   own for all of them but `display`.
    ========================================================================== */
+
+/* .modal is `display: none` until Bootstrap's JavaScript sets it, and an author rule outranks
+   the user agent's `dialog[open] { display: block }`. Qualified with .modal so it cannot reach
+   dialog.session-expired, which is an .app-dialog too and needs `display: flex`. */
+dialog.app-dialog.modal[open] {
+  display: block;
+}
 
 dialog.app-dialog {
   width: 100%;

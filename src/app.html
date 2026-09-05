@@ -34,8 +34,12 @@
         // toggle at all. One key now serves both.
         var theme = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', theme);
+        // Bootstrap themes itself from its own attribute, and both have to be painted in the
+        // same frame or the console flashes light-mode form controls. See settings.svelte.ts.
+        document.documentElement.setAttribute('data-bs-theme', theme);
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-bs-theme', 'light');
       }
     </script>
   </head>

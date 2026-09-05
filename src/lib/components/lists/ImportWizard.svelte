@@ -106,7 +106,8 @@
   const info2Preview = $derived(applyTemplate(info2, firstRow));
   const info3Preview = $derived(applyTemplate(info3, firstRow));
 
-  const progressWidth = $derived(((step - 1) / (TOTAL_STEPS - 1)) * 100);
+  /** 0 to 1 across the rail. Scaled, not sized — see `.wizard-progress-line-active`. */
+  const progressFraction = $derived((step - 1) / (TOTAL_STEPS - 1));
   const currentStep = $derived(STEPS[step - 1] ?? STEPS[0]);
 
   /**
@@ -259,7 +260,7 @@
     <div class="wizard-progress mb-4">
       <div class="d-flex justify-content-between align-items-center position-relative">
         <div class="wizard-progress-line"></div>
-        <div class="wizard-progress-line-active" style="width: {progressWidth}%"></div>
+        <div class="wizard-progress-line-active" style="--wizard-progress: {progressFraction}"></div>
 
         {#each STEPS as item (item.number)}
           <button

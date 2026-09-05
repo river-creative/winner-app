@@ -304,6 +304,18 @@ class SettingsStore {
     this.#theme = theme;
     if (!browser) return;
     document.documentElement.setAttribute('data-theme', theme);
+    /**
+     * Bootstrap themes itself from its own attribute, so it needs telling too.
+     *
+     * Without it Bootstrap stayed in light mode under a dark app, and every token the app had
+     * not hand-written a `[data-theme="dark"]` override for kept its light value: `.text-muted`
+     * resolved to near-black and sat at 1.05:1 against the cards, `--bs-emphasis-color` was
+     * `#000`, and the close button in every dialog was a dark glyph on a dark header. Re-skinning
+     * Bootstrap a component at a time is only ever correct while someone remembers to add the
+     * next rule; this makes the framework's own dark palette the baseline, over which the app's
+     * `[data-theme="dark"]` rules still win — they are equally specific and load afterwards.
+     */
+    document.documentElement.setAttribute('data-bs-theme', theme);
     try {
       localStorage.setItem(THEME_KEY, theme);
     } catch {
