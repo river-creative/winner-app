@@ -1,4 +1,5 @@
 <script lang="ts">
+  import EmptyState from '$lib/components/EmptyState.svelte';
   import TemplateCard from '$lib/components/templates/TemplateCard.svelte';
   import TemplateFormDialog from '$lib/components/templates/TemplateFormDialog.svelte';
   import { availablePlaceholders, writesForSave } from '$lib/services/templates';
@@ -172,13 +173,13 @@
         {/each}
       </div>
     {:else if data.templates.length === 0}
-      <div class="text-center py-5">
-        <i class="bi bi-chat-text display-1 text-muted" aria-hidden="true"></i>
-        <p class="text-muted mt-3">No templates yet</p>
-        <button type="button" class="btn btn-primary" onclick={openAdd}>
-          <i class="bi bi-plus-circle me-2" aria-hidden="true"></i>Add your first template
-        </button>
-      </div>
+      <EmptyState icon="bi-chat-text" title="No templates yet">
+        {#snippet action()}
+          <button type="button" class="btn btn-primary" onclick={openAdd}>
+            <i class="bi bi-plus-circle me-2" aria-hidden="true"></i>Add your first template
+          </button>
+        {/snippet}
+      </EmptyState>
     {:else}
       <div class="row g-3 mb-4">
         {#each data.templates as template (template.templateId)}

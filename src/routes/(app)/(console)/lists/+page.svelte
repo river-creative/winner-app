@@ -1,5 +1,6 @@
 <script lang="ts">
   import Dropdown from '$lib/components/Dropdown.svelte';
+  import EmptyState from '$lib/components/EmptyState.svelte';
   import ImportWizard from '$lib/components/lists/ImportWizard.svelte';
   import ListCard from '$lib/components/lists/ListCard.svelte';
   import ListEntriesDialog from '$lib/components/lists/ListEntriesDialog.svelte';
@@ -352,13 +353,13 @@
     {:else}
       <!-- Reached only on a successful, empty load: a failed load is rendered as an error by
            the console layout, never as "no lists yet". -->
-      <div class="text-center py-5">
-        <i class="bi bi-file-earmark-spreadsheet display-1 text-muted" aria-hidden="true"></i>
-        <p class="text-muted mt-3">No lists uploaded yet</p>
-        <button type="button" class="btn btn-primary" onclick={() => fileInput?.click()}>
-          <i class="bi bi-file-earmark-spreadsheet me-2" aria-hidden="true"></i>Import a CSV file
-        </button>
-      </div>
+      <EmptyState icon="bi-file-earmark-spreadsheet" title="No lists uploaded yet">
+        {#snippet action()}
+          <button type="button" class="btn btn-primary" onclick={() => fileInput?.click()}>
+            <i class="bi bi-file-earmark-spreadsheet me-2" aria-hidden="true"></i>Import a CSV file
+          </button>
+        {/snippet}
+      </EmptyState>
     {/if}
 
     <!--

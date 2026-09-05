@@ -1,5 +1,6 @@
 <script lang="ts">
   import Dropdown from '$lib/components/Dropdown.svelte';
+  import EmptyState from '$lib/components/EmptyState.svelte';
   import PrizeCard from '$lib/components/prizes/PrizeCard.svelte';
   import PrizeFormDialog from '$lib/components/prizes/PrizeFormDialog.svelte';
   import { PRIZE_SORT_OPTIONS } from '$lib/constants/options';
@@ -237,13 +238,13 @@
         {/each}
       </div>
     {:else if data.prizes.length === 0}
-      <div class="text-center py-5">
-        <i class="bi bi-gift display-1 text-muted" aria-hidden="true"></i>
-        <p class="text-muted mt-3">No prizes added yet</p>
-        <button type="button" class="btn btn-primary" onclick={openAdd}>
-          <i class="bi bi-plus-circle me-2" aria-hidden="true"></i>Add your first prize
-        </button>
-      </div>
+      <EmptyState icon="bi-gift" title="No prizes added yet">
+        {#snippet action()}
+          <button type="button" class="btn btn-primary" onclick={openAdd}>
+            <i class="bi bi-plus-circle me-2" aria-hidden="true"></i>Add your first prize
+          </button>
+        {/snippet}
+      </EmptyState>
     {:else}
       <!--
         The select toggle needs no optimistic handling: `setup.selectPrize` writes only local
