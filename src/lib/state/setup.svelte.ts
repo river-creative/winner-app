@@ -45,6 +45,16 @@ class SetupStore {
 
   readonly validSelectedCount = $derived(this.validSelectedIds.length);
 
+  /**
+   * Is every list selected?
+   *
+   * Counted from `validSelectedIds`, so a stale id left in the persisted selection by a deleted
+   * list cannot make this read true — the same guard every other count here relies on.
+   */
+  readonly allListsSelected = $derived(
+    data.lists.length > 0 && this.validSelectedCount === data.lists.length
+  );
+
   readonly selectedLists = $derived(
     this.validSelectedIds
       .map((listId) => data.listById(listId))
@@ -133,6 +143,16 @@ class SetupStore {
   clearSelectedLists(): void {
     this.#selectedListIds.current = [];
     this.capWinnersCount();
+  }
+
+  /**
+   * One control for both directions: select everything, or clear it once everything is selected.
+   * Same shape as `toggleList` above — two buttons could not share a phone row with the sort
+   * control and Add.
+   */
+  toggleSelectAllLists(): void {
+    if (this.allListsSelected) this.clearSelectedLists();
+    else this.selectAllLists();
   }
 
   /** Selecting a prize adopts its default winner count, when it has one. */

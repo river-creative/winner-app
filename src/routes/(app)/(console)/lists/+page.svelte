@@ -214,10 +214,12 @@
           {/each}
         </div>
 
+        <!-- No "Sort:" prefix on the label: the direction icon already says what this control is,
+             and the three toolbar controls only share one phone row without it. -->
         <Dropdown
           class="d-md-none section-toolbar-sort"
           buttonClass="btn btn-outline-secondary btn-sm"
-          label="Sort: {activeSortLabel}"
+          label={activeSortLabel}
           icon={sortDir === 'asc' ? 'bi-sort-down' : 'bi-sort-up'}
           ariaLabel="Change how lists are sorted"
           align="start"
@@ -248,19 +250,23 @@
 
       <div class="section-toolbar-group">
         {#if hasLists}
-          <div class="btn-group btn-group-sm" role="group" aria-label="Bulk list selection">
-            <button type="button" class="btn btn-outline-secondary" onclick={() => setup.selectAllLists()}>
-              <i class="bi bi-check-square me-1" aria-hidden="true"></i>Select All
-            </button>
-            <button
-              type="button"
-              class="btn btn-outline-secondary"
-              disabled={setup.validSelectedCount === 0}
-              onclick={() => setup.clearSelectedLists()}
-            >
-              <i class="bi bi-square me-1" aria-hidden="true"></i>Clear All
-            </button>
-          </div>
+          <!-- One button, both directions: it selects everything, then clears it once everything
+               is selected. Two buttons could not share a phone row with the sort control and
+               Add, and one control with one behaviour beats two spellings of it.
+
+               No `aria-pressed`: the label already changes to name the action, and a toggle
+               state on top of it makes a screen reader announce "Clear All, pressed" — two
+               signals for one thing, the second of which reads as though clearing were the
+               state that is on. A changing label or `aria-pressed`, never both. -->
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            title={setup.allListsSelected ? 'Clear the list selection' : 'Select every list'}
+            onclick={() => setup.toggleSelectAllLists()}
+          >
+            <i class="bi {setup.allListsSelected ? 'bi-square' : 'bi-check-square'}" aria-hidden="true"></i>
+            {setup.allListsSelected ? 'Clear All' : 'Select All'}
+          </button>
         {/if}
 
         <Dropdown buttonClass="btn btn-primary" label="Add" icon="bi-plus-circle" ariaLabel="Add a list">

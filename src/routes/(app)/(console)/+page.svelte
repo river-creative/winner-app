@@ -71,21 +71,18 @@
           </div>
 
           <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <!-- The same single toggle the Lists tab uses — one control, one behaviour, and no
+                 `aria-pressed` for the reason given there. -->
             <button
               type="button"
               class="btn btn-sm btn-outline-primary"
               disabled={data.lists.length === 0}
-              onclick={() => setup.selectAllLists()}
+              title={setup.allListsSelected ? 'Clear the list selection' : 'Select every list'}
+              onclick={() => setup.toggleSelectAllLists()}
             >
-              Select All
-            </button>
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              disabled={setup.validSelectedCount === 0}
-              onclick={() => setup.clearSelectedLists()}
-            >
-              Clear All
+              <i class="bi me-1 {setup.allListsSelected ? 'bi-square' : 'bi-check-square'}" aria-hidden="true"
+              ></i>
+              {setup.allListsSelected ? 'Clear All' : 'Select All'}
             </button>
             <span class="text-muted">{setup.validSelectedCount} selected</span>
           </div>

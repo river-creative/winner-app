@@ -463,10 +463,23 @@
     padding-left: 2.25rem;
   }
 
-  .form-check .form-check-input {
+  .form-check:not(.form-switch) .form-check-input {
     width: 1.5em;
     height: 1.5em;
     margin-left: -2.25rem;
+    margin-top: 0.55rem;
+  }
+
+  /* A switch is a pill, not a square: it needs its own width and the wider
+     indent that goes with it, or the checkbox sizing above squares it off. */
+  .form-switch {
+    padding-left: 3.5rem;
+  }
+
+  .form-switch .form-check-input {
+    width: 2.75em;
+    height: 1.5em;
+    margin-left: -3.5rem;
     margin-top: 0.55rem;
   }
 
@@ -501,6 +514,14 @@
     min-height: 44px;
     min-width: 44px;
     justify-content: center;
+  }
+
+  /* Wizard steps are buttons but not .btn — and once the labels are hidden on a
+     phone only the 32px circle is left to aim at. */
+  .wizard-step {
+    min-height: 44px;
+    min-width: 44px;
+    justify-content: flex-start;
   }
 }
 
@@ -694,17 +715,34 @@
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  /* The name sizes clamp to a floor meant for a projector — at phone column
-     widths that floor is wider than the column, which is what was snapping
-     surnames in half ("Riverw alk"). Lower each floor to match the narrower
-     column. Selectors mirror their counterparts in styles.css exactly so they
-     win on order rather than by accident of specificity. */
-  .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) .winner-info2,
-  .winners-grid:has(.winner-card:nth-child(3):nth-last-child(1)) .winner-info2,
-  .winners-grid:has(.winner-card:nth-child(4):nth-last-child(1)) .winner-info2 {
-    font-size: calc(var(--winner-name-scale, 1) * clamp(1.1rem, 9cqw, 2.8rem));
+  /* Size the winner name against the CARD, not the grid.
+     styles.css sizes the three info lines in `cqw`, but the only container-query
+     container is `.winners-grid` — so at two columns the name was sized for a box
+     twice as wide as the one it had to fit in, and long surnames were snapped in
+     half ("Mccutcheon" wanted 175px in a 159px column). Making each card its own
+     container lets one expression stay correct at every column count instead of a
+     floor tuned per bracket.
+     The selectors mirror their counterparts in styles.css exactly, so they win on
+     order rather than by accident of specificity. */
+  .winner-card {
+    container-type: inline-size;
   }
 
+  .winners-grid .winner-info1 {
+    font-size: clamp(0.6rem, 7cqw, 0.95rem);
+  }
+
+  .winners-grid .winner-info3 {
+    font-size: clamp(0.55rem, 5.5cqw, 0.8rem);
+  }
+
+  .winners-grid:has(.winner-card:nth-child(1):nth-last-child(1)) .winner-info2 {
+    font-size: calc(var(--winner-name-scale, 1) * clamp(1.4rem, 14cqw, 4.5rem));
+  }
+
+  .winners-grid:has(.winner-card:nth-child(2):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(3):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(4):nth-last-child(1)) .winner-info2,
   .winners-grid:has(.winner-card:nth-child(5):nth-last-child(1)) .winner-info2,
   .winners-grid:has(.winner-card:nth-child(6):nth-last-child(1)) .winner-info2,
   .winners-grid:has(.winner-card:nth-child(7):nth-last-child(1)) .winner-info2,
@@ -712,16 +750,12 @@
   .winners-grid:has(.winner-card:nth-child(9):nth-last-child(1)) .winner-info2,
   .winners-grid:has(.winner-card:nth-child(10):nth-last-child(1)) .winner-info2,
   .winners-grid:has(.winner-card:nth-child(11):nth-last-child(1)) .winner-info2,
-  .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)) .winner-info2 {
-    font-size: calc(var(--winner-name-scale, 1) * clamp(1rem, 8cqw, 2rem));
-  }
-
-  .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)) .winner-info2 {
-    font-size: calc(var(--winner-name-scale, 1) * clamp(0.8rem, 7cqw, 1.7rem));
-  }
-
-  .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)) .winner-info2 {
-    font-size: calc(var(--winner-name-scale, 1) * clamp(0.7rem, 6cqw, 1.4rem));
+  .winners-grid:has(.winner-card:nth-child(12):nth-last-child(1)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(n+13):nth-child(-n+25)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(n+26):nth-child(-n+49)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(n+50):nth-child(-n+99)) .winner-info2,
+  .winners-grid:has(.winner-card:nth-child(n+100)) .winner-info2 {
+    font-size: calc(var(--winner-name-scale, 1) * clamp(0.7rem, 11cqw, 1.9rem));
   }
 }
 
@@ -894,46 +928,63 @@
     flex: 1 1 100%;
   }
 
-  /* `.section-toolbar-sort` is listed alongside `.dropdown` so the rule holds whether the class
-     sits on the dropdown itself (which is how the Svelte screens do it) or on a wrapper. */
-  .section-toolbar > .section-toolbar-group,
-  .section-toolbar > .section-toolbar-sort,
+  /* `display: contents` dissolves the actions wrapper so the sort control, the
+     select-all toggle and Add become siblings on a single flex line — they are
+     in different parents in the markup because the desktop layout needs them
+     grouped, and a nested flex container cannot join the outer row. It changes
+     rendering, not the DOM, so a `>` selector still has to reach through it. */
+  .section-toolbar > .section-toolbar-group {
+    display: contents;
+  }
+
+  /* `auto` basis, not 0: rigid thirds gave the sort control less room than its
+     own label needed ("Name" became "Nam…") while the wider Select All button
+     had space to spare. Sizing from content and sharing the remainder fits every
+     label, and they still shrink together if one ever grows too long.
+     `.section-toolbar-sort` sits on the dropdown itself on the Svelte screens,
+     so `.dropdown` already covers it. */
   .section-toolbar > .btn-group,
   .section-toolbar > .dropdown,
-  .section-toolbar > .btn {
-    flex: 1 1 100%;
-  }
-
-  /* Sort pills split the row evenly instead of overflowing it. */
-  .section-toolbar .btn-group {
-    width: 100%;
-  }
-
-  .section-toolbar .btn-group > .btn {
-    flex: 1 1 0;
-    min-width: 0;
-    padding-left: 0.35rem;
-    padding-right: 0.35rem;
-  }
-
-  /* Inside the actions group the same rule applies one level down: the bulk
-     button pair takes a row, the Add dropdown takes the next. */
-  .section-toolbar > .section-toolbar-group > .btn-group,
+  .section-toolbar > .btn,
+  .section-toolbar > .section-toolbar-group > .btn,
   .section-toolbar > .section-toolbar-group > .dropdown {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
-  /* A toolbar dropdown owns its row, so its trigger fills it rather than sitting
-     as a lone small button against the left edge. */
+  /* One compact size across the row: the markup mixes .btn and .btn-sm because
+     desktop wants Add to read as the primary action, which looks accidental once
+     they sit side by side. */
+  .section-toolbar .btn {
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .section-toolbar .btn > .bi {
+    margin-right: 0.25rem;
+  }
+
+  /* Icon-plus-caret buttons have little room for their label at 320px. */
+  .section-toolbar .dropdown-toggle::after {
+    margin-left: 0.25rem;
+  }
+
+  /* Only the trigger stretches, never the wrapper: a `width: 100%` wrapper makes
+     its own flex basis the full row, so each control would claim a line of its
+     own. flex-grow already fills the row when a toolbar has one control. */
   .section-toolbar .dropdown > .dropdown-toggle {
     width: 100%;
   }
 
-  /* The menu renders in the top layer, whose containing block is the viewport, so a percentage
-     would size it to the screen rather than to the trigger. Dropdown.svelte publishes the
-     trigger's measured width for exactly this. */
+  /* The menus stay comfortable — only the triggers are tight. Sizing these to the
+     trigger, as the wider dropdowns do, would now cut them to a third of the
+     screen, because the triggers share one row from here down. */
   .section-toolbar .dropdown-menu {
-    width: var(--dropdown-trigger-width, auto);
+    min-width: 12rem;
   }
 
   .section-toolbar-sort .dropdown-item {

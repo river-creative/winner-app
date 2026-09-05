@@ -182,12 +182,15 @@
           label=""
           buttonClass="btn btn-outline-secondary btn-sm"
           align="start"
-          menuClass="dropdown-menu-match-trigger"
           ariaLabel="Change how prizes are sorted"
         >
+          <!-- No "Sort:" prefix: the direction icon already says what this control is, and the
+               toolbar controls only share one phone row without it. The menu is not sized to the
+               trigger either — responsive.css §5 gives it a comfortable min-width, because from
+               here down the trigger is only a third of the row. -->
           {#snippet trigger()}
             <i class="bi me-1 {sortDir === 'asc' ? 'bi-sort-down' : 'bi-sort-up'}" aria-hidden="true"></i>
-            Sort: {sortLabel}
+            {sortLabel}
           {/snippet}
 
           {#snippet children(close)}
