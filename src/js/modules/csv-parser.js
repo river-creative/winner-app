@@ -7,18 +7,12 @@ import { Lists } from './lists.js';
 import { Database } from './database.js';
 import { DOMUtils } from './dom-utils.js';
 import eventManager from './event-manager.js';
-import { settings, Settings } from './settings.js';
+import { settings } from './settings.js';
 import { Validation } from './validation.js';
 import { SafeHTML } from './safe-html.js';
+import { ListConfig, WIZARD_MODE } from './list-config.js';
 
 let pendingCSVData = null;
-
-// Handler for skip existing winners checkbox
-function handleSkipWinnersChange(event) {
-  const checked = event.target.checked;
-  Settings.saveSingleSetting('skipExistingWinners', checked);
-  console.log('Skip existing winners setting saved:', checked);
-}
 
 // Utility functions for camelizing object keys
 function camelize(key) {
@@ -244,6 +238,8 @@ function showCSVPreview(data, listName) {
     listNameInput.value = listName || '';
   }
 
+  // Claim the shared wizard for importing — it may have been left in edit mode.
+  ListConfig.setWizardMode({ mode: WIZARD_MODE.IMPORT });
   showNameConfiguration(headers, data[0]);
 
   previewCard.style.display = 'block';
@@ -330,7 +326,14 @@ function detectNameTemplate(headers, firstRow) {
   return '';
 }
 
-function showNameConfiguration(headers, firstRow) {
+/**
+ * Populate and show the configuration wizard.
+ *
+ * `existingConfig` is supplied by the edit flow (Lists.editListConfig). Defaults are always
+ * computed first and the stored config is overlaid on top, so a list saved before a given
+ * field existed inherits the detected default rather than an empty control.
+ */
+function showNameConfiguration(headers, firstRow, existingConfig = null) {
   const nameConfigCard = document.getElementById('nameConfigCard');
   const availableFields = document.getElementById('availableFields');
   const nameTemplateInput = document.getElementById('nameTemplate');
@@ -339,28 +342,19 @@ function showNameConfiguration(headers, firstRow) {
   const columnIdSection = document.getElementById('columnIdSection');
   const autoGenerateId = document.getElementById('autoGenerateId');
   const useColumnId = document.getElementById('useColumnId');
-  const skipExistingWinnersCheckbox = document.getElementById('skipExistingWinners');
+  const skipExistingWinnersCheckbox = document.getElementById('listSkipExistingWinners');
 
   nameConfigCard.style.display = 'block';
   availableFields.innerHTML = '';
 
-  // Load the skipExistingWinners setting
-  if (skipExistingWinnersCheckbox) {
-    console.log('Skip winners checkbox found, setting to:', settings.skipExistingWinners);
-    skipExistingWinnersCheckbox.checked = settings.skipExistingWinners || false;
-
-    // Add change listener to save the setting
-    skipExistingWinnersCheckbox.removeEventListener('change', handleSkipWinnersChange);
-    skipExistingWinnersCheckbox.addEventListener('change', handleSkipWinnersChange);
-
-    // Make sure the checkbox and its container are visible
-    skipExistingWinnersCheckbox.style.display = 'inline-block';
-    const checkboxContainer = skipExistingWinnersCheckbox.closest('.mb-3');
-    if (checkboxContainer) {
-      checkboxContainer.style.display = 'block';
-    }
-  } else {
-    console.error('Skip winners checkbox not found!');
+  // skipExistingWinners is a per-list setting. The global one is only the default a NEW list
+  // starts from — toggling it here changes this list, never the app-wide preference.
+  // An existing list's own value is applied afterwards by applyWizardConfig.
+  skipExistingWinnersCheckbox.checked = settings.skipExistingWinners || false;
+  skipExistingWinnersCheckbox.style.display = 'inline-block';
+  const checkboxContainer = skipExistingWinnersCheckbox.closest('.mb-3');
+  if (checkboxContainer) {
+    checkboxContainer.style.display = 'block';
   }
 
   // Populate available fields for name template
@@ -556,6 +550,10 @@ function showNameConfiguration(headers, firstRow) {
   info2Template.addEventListener('input', updateInfoPreviews);
   info3Template.addEventListener('input', updateInfoPreviews);
 
+  // Overlay the stored configuration on top of the detected defaults (edit flow only).
+  // Must run before the previews so they reflect what will actually be saved.
+  ListConfig.applyWizardConfig(existingConfig);
+
   // Initial setup
   updatePreview();
   updateInfoPreviews();
@@ -563,6 +561,13 @@ function showNameConfiguration(headers, firstRow) {
 }
 
 async function handleConfirmUpload() {
+  // The confirm button is shared with the edit flow; hand off when the wizard is not ours.
+  const { mode, listId } = ListConfig.getWizardMode();
+  if (mode === WIZARD_MODE.EDIT) {
+    await Lists.saveListConfigFromWizard(listId);
+    return;
+  }
+
   if (!pendingCSVData) {
     UI.showToast('No data to upload', 'error');
     return;
@@ -571,19 +576,14 @@ async function handleConfirmUpload() {
   try {
     UI.showProgress('Processing List', 'Validating data...');
 
-    // Read the list name from the input field if provided, otherwise use the filename/report name
-    const listNameInput = document.getElementById('listName');
-    const finalListName = listNameInput.value.trim() || pendingCSVData.listName;
+    // One read of the whole wizard, shared with the edit flow so both stay in step.
+    const wizardConfig = ListConfig.readWizardConfig();
 
-    const nameConfig = getNameConfiguration();
-    const infoConfig = getInfoConfiguration();
-    const idConfig = getIdConfiguration();
-
-    // Get skipExistingWinners from checkbox if available, otherwise use settings
-    const skipCheckbox = document.getElementById('skipExistingWinners');
-    const skipExistingWinners = skipCheckbox ? skipCheckbox.checked : settings.skipExistingWinners;
-
-    console.log('Skip existing winners:', skipExistingWinners, 'Checkbox exists:', !!skipCheckbox);
+    const finalListName = wizardConfig.name || pendingCSVData.listName;
+    const nameConfig = wizardConfig.nameConfig;
+    const infoConfig = wizardConfig.infoConfig;
+    const idConfig = wizardConfig.idConfig;
+    const skipExistingWinners = wizardConfig.listSettings.skipExistingWinners;
 
     // Validate ID configuration if using column-based IDs
     if (idConfig.source === 'column') {
@@ -656,20 +656,6 @@ async function handleConfirmUpload() {
 
     const listId = UI.generateId();
 
-    // Get per-list settings from checkboxes (if present)
-    const removeWinnersCheckbox = document.getElementById('listRemoveWinnersFromList');
-    const preventSamePrizeCheckbox = document.getElementById('listPreventWinningSamePrize');
-
-    // Build list settings - use checkbox values or fall back to global settings
-    const removeWinnersFromList = removeWinnersCheckbox
-      ? removeWinnersCheckbox.checked
-      : settings.preventDuplicates;
-
-    // preventWinningSamePrize is auto-enabled when NOT removing winners from list
-    const preventWinningSamePrize = !removeWinnersFromList
-      ? true
-      : (preventSamePrizeCheckbox ? preventSamePrizeCheckbox.checked : settings.preventSamePrize);
-
     const listData = {
       listId: listId,
       metadata: {
@@ -688,11 +674,9 @@ async function handleConfirmUpload() {
         // Sync tracking
         lastSyncAt: null,
         syncCount: 0,
-        // Per-list settings
-        listSettings: {
-          removeWinnersFromList: removeWinnersFromList,
-          preventWinningSamePrize: preventWinningSamePrize
-        }
+        // Per-list settings, read from the wizard above. The global settings only supplied
+        // the defaults the wizard opened with.
+        listSettings: wizardConfig.listSettings
       },
       entries: dataToUpload.map((row, index) => ({
         id: generateEntryId(row, index, idConfig),
@@ -741,43 +725,8 @@ async function handleConfirmUpload() {
   }
 }
 
-function getNameConfiguration() {
-  const nameTemplateInput = document.getElementById('nameTemplate');
-  return nameTemplateInput.value.trim();
-}
-
-function getInfoConfiguration() {
-  const info1Template = document.getElementById('info1Template');
-  const info2Template = document.getElementById('info2Template');
-  const info3Template = document.getElementById('info3Template');
-
-  return {
-    info1: info1Template.value.trim(),
-    info2: info2Template.value.trim(),
-    info3: info3Template.value.trim()
-  };
-}
-
-function getIdConfiguration() {
-  const autoGenerateId = document.getElementById('autoGenerateId');
-  const useColumnId = document.getElementById('useColumnId');
-  const idColumnSelect = document.getElementById('idColumnSelect');
-
-  if (useColumnId.checked) {
-    const selectedColumn = idColumnSelect.value;
-    if (!selectedColumn) {
-      throw new Error('Please select a column for record IDs');
-    }
-    return {
-      source: 'column',
-      column: selectedColumn
-    };
-  } else {
-    return {
-      source: 'auto'
-    };
-  }
-}
+// The wizard's config getters now live in list-config.js as readWizardConfig(), shared with
+// the edit flow so importing and editing can never read the same controls differently.
 
 function validateColumnIds(data, columnName) {
   const ids = [];
@@ -837,11 +786,18 @@ function generateEntryId(row, index, idConfig) {
 }
 
 function handleCancelUpload(showToast = true) {
+  const wasEditing = ListConfig.getWizardMode().mode === WIZARD_MODE.EDIT;
+
   document.getElementById('dataPreviewCard').style.display = 'none';
   document.getElementById('nameConfigCard').style.display = 'none';
   pendingCSVData = null;
+
+  // Always hand the wizard back in import mode, or the next CSV upload opens a wizard still
+  // locked to the list that was being edited.
+  ListConfig.setWizardMode({ mode: WIZARD_MODE.IMPORT });
+
   if (showToast) {
-    UI.showToast('Upload cancelled', 'info');
+    UI.showToast(wasEditing ? 'Changes discarded' : 'Upload cancelled', 'info');
   }
 }
 
@@ -851,6 +807,8 @@ export const CSVParser = {
   handleConfirmUpload,
   handleCancelUpload,
   showCSVPreview,
+  // Used by Lists.editListConfig to drive the same wizard in edit mode.
+  showNameConfiguration,
   get pendingCSVData() { return pendingCSVData; },
   set pendingCSVData(data) { pendingCSVData = data; }
 };

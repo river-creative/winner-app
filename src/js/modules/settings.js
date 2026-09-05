@@ -15,7 +15,7 @@ let settings = {
   preventDuplicates: false,
   hideEntryCounts: false,
   enableDebugLogs: false,
-  skipExistingWinners: false, // Only used in CSV import, not general settings
+  skipExistingWinners: false, // Default for new lists; each list then owns its own value
   preventSamePrize: false,
   fontFamily: 'Open Sans',
   primaryColor: '#6366f1',
@@ -356,7 +356,8 @@ function loadSettingsToForm() {
     'preventSamePrize': settings.preventSamePrize,
     'hideEntryCounts': settings.hideEntryCounts,
     'enableDebugLogs': settings.enableDebugLogs,
-    // skipExistingWinners is handled separately in CSV import dialog
+    // The default a newly imported list starts with; each list then owns its own value.
+    'skipExistingWinners': settings.skipExistingWinners,
     'fontFamily': settings.fontFamily,
     'primaryColor': settings.primaryColor,
     'secondaryColor': settings.secondaryColor,
@@ -926,6 +927,7 @@ async function autoSaveIndividualSetting(fieldId) {
     const fieldToSettingMap = {
       'preventDuplicates': 'preventDuplicates',
       'preventSamePrize': 'preventSamePrize',
+      'skipExistingWinners': 'skipExistingWinners',
       'hideEntryCounts': 'hideEntryCounts',
       'celebrationAutoTrigger': 'celebrationAutoTrigger',
       'enableDebugLogs': 'enableDebugLogs',
@@ -1248,7 +1250,7 @@ function setupAllSettingsAutoSave() {
     'preventSamePrize',
     'hideEntryCounts',
     'enableDebugLogs',
-    // 'skipExistingWinners', - handled in CSV import dialog
+    'skipExistingWinners',
     'fontFamily',
     'primaryColor',
     'secondaryColor',

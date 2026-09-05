@@ -4,6 +4,9 @@
 
 import { Database } from './database.js';
 import { UI } from './ui.js';
+import { settings } from './settings.js';
+import { ListConfig, WIZARD_MODE } from './list-config.js';
+import { CSVParser } from './csv-parser.js';
 
 // Load lists - uses centralized data store
 // Alpine x-for templates react automatically to store changes
@@ -233,14 +236,27 @@ async function syncList(listId) {
     // Determine ID column from idConfig
     const idColumn = list.metadata.idConfig?.column || 'idCard';
 
-    // If removeWinnersFromList is active, get existing winner IDs to exclude
+    // Two independent exclusions, both driven by this list's own settings:
+    //
+    //   removeWinnersFromList — do not re-add someone who won FROM THIS LIST. Without it a
+    //     winner removed after a draw simply reappears on the next sync.
+    //   skipExistingWinners   — do not add someone who has won ANYWHERE. This is the same
+    //     rule the import applies; honouring it here is what makes it a lasting list setting
+    //     rather than a one-off import filter.
+    //
+    // skipExistingWinners falls back to the global default for lists imported before it
+    // became per-list.
+    const excludeThisListsWinners = list.metadata.listSettings?.removeWinnersFromList !== false;
+    const excludeAllWinners = list.metadata.listSettings?.skipExistingWinners
+      ?? settings.skipExistingWinners;
+
     let winnerIds = new Set();
-    if (list.metadata.listSettings?.removeWinnersFromList !== false) {
+    if (excludeThisListsWinners || excludeAllWinners) {
       const winners = await Database.getFromStore('winners');
       if (winners && Array.isArray(winners)) {
-        // Filter winners that came from this list
         winners.forEach(w => {
-          if (w.listId === listId && w.entryId) {
+          if (!w.entryId) return;
+          if (excludeAllWinners || w.listId === listId) {
             winnerIds.add(w.entryId);
           }
         });
@@ -302,6 +318,12 @@ async function syncList(listId) {
 }
 
 // Edit list configuration (opens modal)
+/**
+ * Open the import wizard in edit mode, pre-filled from a list.
+ *
+ * The same wizard instance serves both flows — see list-config.js for why it is not
+ * duplicated into a modal.
+ */
 async function editListConfig(listId) {
   try {
     const list = await Database.getFromStore('lists', listId);
@@ -310,28 +332,52 @@ async function editListConfig(listId) {
       return;
     }
 
-    // Get modal element and its Alpine data
-    const modalEl = document.getElementById('editListConfigModal');
-    if (!modalEl) {
-      UI.showToast('Edit modal not found', 'error');
+    if (!list.entries || list.entries.length === 0) {
+      UI.showToast('This list has no entries, so there are no fields to configure', 'warning');
       return;
     }
 
-    // Get current settings with defaults
-    const removeWinners = list.metadata?.listSettings?.removeWinnersFromList ?? true;
-    const listName = list.metadata?.name || '';
-
-    // Update Alpine data on the modal
-    const alpineData = Alpine.$data(modalEl);
-    if (alpineData) {
-      alpineData.listId = listId;
-      alpineData.listName = listName;
-      alpineData.removeWinners = removeWinners;
+    // Field chips and the ID column picker are built from the entry keys. Take the union of
+    // the first entries rather than just the first one, so a record with a missing value
+    // does not hide a column from the whole wizard.
+    const headers = [...new Set(
+      list.entries.slice(0, 50).flatMap(entry => Object.keys(entry.data ?? {}))
+    )];
+    if (headers.length === 0) {
+      UI.showToast('This list has no fields to configure', 'warning');
+      return;
     }
 
-    // Show the modal
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
+    const listName = list.metadata?.name || '';
+
+    // A stale preview from an abandoned import would otherwise sit above the wizard.
+    document.getElementById('dataPreviewCard').style.display = 'none';
+
+    ListConfig.setWizardMode({ mode: WIZARD_MODE.EDIT, listId, listName });
+
+    // Defaults are detected first, then the stored config is overlaid — a list saved before
+    // a field existed inherits the detected default instead of an empty control.
+    CSVParser.showNameConfiguration(headers, list.entries[0].data, {
+      name: listName,
+      nameConfig: list.metadata?.nameConfig,
+      infoConfig: list.metadata?.infoConfig,
+      idConfig: list.metadata?.idConfig,
+      listSettings: {
+        removeWinnersFromList: list.metadata?.listSettings?.removeWinnersFromList ?? true,
+        preventWinningSamePrize: list.metadata?.listSettings?.preventWinningSamePrize ?? false,
+        // Lists imported before this became per-list have no value of their own; the global
+        // setting is the documented default for exactly that case.
+        skipExistingWinners: list.metadata?.listSettings?.skipExistingWinners
+          ?? settings.skipExistingWinners
+      }
+    });
+
+    // The wizard lives well below the card whose gear was clicked, so without this the click
+    // reads as though nothing happened.
+    const nameConfigCard = document.getElementById('nameConfigCard');
+    nameConfigCard.scrollIntoView({ behavior: 'smooth' });
+    // preventScroll, or focus() jumps the page and cancels the smooth scroll just started.
+    document.getElementById('listName').focus({ preventScroll: true });
 
   } catch (error) {
     console.error('Error opening edit config:', error);
@@ -339,8 +385,14 @@ async function editListConfig(listId) {
   }
 }
 
-// Save list configuration
-async function saveListConfig(listId) {
+/**
+ * Persist wizard changes back onto a list.
+ *
+ * Only metadata is written. Entries are deliberately untouched: they are already keyed by
+ * idConfig and winner records reference those keys, which is also why the wizard renders the
+ * record ID step read-only when editing.
+ */
+async function saveListConfigFromWizard(listId) {
   try {
     const list = await Database.getFromStore('lists', listId);
     if (!list) {
@@ -348,41 +400,21 @@ async function saveListConfig(listId) {
       return;
     }
 
-    // Get values from modal
-    const modalEl = document.getElementById('editListConfigModal');
-    const alpineData = Alpine.$data(modalEl);
+    const config = ListConfig.readWizardConfig();
 
-    const listName = alpineData?.listName || document.getElementById('editListName')?.value;
-    const removeWinners = alpineData?.removeWinners ?? document.getElementById('editRemoveWinnersFromList')?.checked ?? true;
+    list.metadata.name = config.name || list.metadata.name;
+    list.metadata.nameConfig = config.nameConfig;
+    list.metadata.infoConfig = config.infoConfig;
+    list.metadata.listSettings = {
+      ...list.metadata.listSettings,
+      ...config.listSettings
+    };
 
-    // preventWinningSamePrize is auto-enabled when NOT removing winners
-    const preventSamePrize = !removeWinners
-      ? true
-      : (document.getElementById('editPreventWinningSamePrize')?.checked ?? false);
-
-    // Update list metadata
-    list.metadata.name = listName;
-
-    // Initialize listSettings if not present
-    if (!list.metadata.listSettings) {
-      list.metadata.listSettings = {};
-    }
-
-    list.metadata.listSettings.removeWinnersFromList = removeWinners;
-    list.metadata.listSettings.preventWinningSamePrize = preventSamePrize;
-
-    // Save the updated list
     await Database.saveToStore('lists', list);
 
-    // Hide modal
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) {
-      modal.hide();
-    }
-
+    CSVParser.handleCancelUpload(false);
     UI.showToast('List settings saved', 'success');
 
-    // Refresh lists display
     await loadLists();
 
   } catch (error) {
@@ -401,7 +433,7 @@ export const Lists = {
   formatDisplayName,
   syncList,
   editListConfig,
-  saveListConfig
+  saveListConfigFromWizard
 };
 
 // Keep for onclick handlers in Alpine templates

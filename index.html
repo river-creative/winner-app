@@ -729,10 +729,14 @@
           <div class="col-12">
             <div class="card" id="nameConfigCard" style="display: none;">
               <div class="card-body">
+                <!-- Names the flow that owns the wizard. In edit mode it also names the list,
+                     which is the only thing on screen identifying what is about to change —
+                     the wizard sits well below the card whose gear opened it. -->
+                <h5 class="card-title mb-3" id="wizardHeading">Import Configuration</h5>
                 <div class="mb-3">
                   <label for="listName" class="form-label">List Name (Optional)</label>
                   <input type="text" class="form-control" id="listName" placeholder="Enter custom list name or leave empty to use filename">
-                  <div class="form-text">If left empty, the CSV filename will be used as the list name.</div>
+                  <div class="form-text" id="listNameHelp">If left empty, the CSV filename will be used as the list name.</div>
                 </div>
                 <!-- Import Configuration Wizard -->
                 <hr>
@@ -815,6 +819,18 @@
                       <h5 class="mb-3"><i class="bi bi-key me-2 text-primary"></i>Record ID Configuration</h5>
                       <p class="text-muted mb-4">Configure how each record is uniquely identified.</p>
 
+                      <!-- Shown only when editing an existing list. The controls stay visible so
+                           the ID column can be seen, but are disabled: entries are already keyed
+                           by it and winner records reference those ids. aria-describedby on each
+                           control points here so the reason is announced, not just displayed. -->
+                      <div class="alert alert-secondary py-2" id="idConfigLockedNote" hidden>
+                        <small>
+                          <i class="bi bi-lock me-1"></i>The record ID is set when a list is
+                          imported and cannot be changed afterwards — entries are keyed by it and
+                          winner history refers to those keys. Re-import the list to change it.
+                        </small>
+                      </div>
+
                       <div class="mb-3">
                         <label class="form-label">Record ID Source</label>
                         <div class="form-check">
@@ -844,14 +860,18 @@
                     <!-- Step 2: Import Options -->
                     <div class="wizard-pane" x-show="step === 2" x-transition:enter="fade-in">
                       <h5 class="mb-3"><i class="bi bi-filter me-2 text-primary"></i>Import Options</h5>
-                      <p class="text-muted mb-4">Configure how records should be processed during import.</p>
+                      <p class="text-muted mb-4">Configure how records are handled when they are added to this list.</p>
 
+                      <!-- id is listSkipExistingWinners, matching its per-list siblings below.
+                           The bare `skipExistingWinners` id belongs to the Settings tab control
+                           that sets the DEFAULT for new lists — two elements sharing it would
+                           make the settings loader write the global value into this checkbox. -->
                       <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="skipExistingWinners">
-                        <label class="form-check-label" for="skipExistingWinners">
+                        <input class="form-check-input" type="checkbox" id="listSkipExistingWinners">
+                        <label class="form-check-label" for="listSkipExistingWinners">
                           Skip records that are already in the winner list
                         </label>
-                        <div class="form-text">Records are matched by their unique ID. Records with the same name but different IDs will still be uploaded.</div>
+                        <div class="form-text">Records are matched by their unique ID. Records with the same name but different IDs will still be added. Also applies when this list is synced from Ministry Platform.</div>
                       </div>
                     </div>
 
@@ -962,8 +982,10 @@
                       <button class="btn btn-secondary" id="cancelUpload">
                         <i class="bi bi-x-lg me-1"></i>Cancel
                       </button>
-                      <button class="btn btn-outline-primary" @click="document.getElementById('confirmUpload').click()" x-show="step < totalSteps">
-                        <i class="bi bi-skip-forward me-1"></i>Use Defaults
+                      <!-- Skips the remaining steps and commits what is on screen. Labelled
+                           per mode: "Use Defaults" only makes sense for a fresh import. -->
+                      <button class="btn btn-outline-primary" id="skipToConfirm" @click="document.getElementById('confirmUpload').click()" x-show="step < totalSteps">
+                        <i class="bi bi-skip-forward me-1"></i><span id="skipToConfirmLabel">Use Defaults</span>
                       </button>
                     </div>
 
@@ -1768,6 +1790,19 @@
                     </label>
                   </div>
                 </div>
+                <!-- Default only. Each list owns its own copy of this from the moment it is
+                     imported, editable per list through the gear on its card. -->
+                <div class="mb-3">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="skipExistingWinners"
+                           x-model="$store.settings.skipExistingWinners"
+                           @change="$store.settings.save('skipExistingWinners')">
+                    <label class="form-check-label" for="skipExistingWinners">
+                      Skip existing winners by default
+                      <i class="bi bi-info-circle text-muted ms-1" data-bs-toggle="tooltip" title="The starting value for new lists: records that have already won are not added. Each list can override this in its own settings."></i>
+                    </label>
+                  </div>
+                </div>
                 <div class="mb-3">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="hideEntryCounts"
@@ -2271,54 +2306,6 @@
     </div>
   </div>
 
-  <!-- Edit List Config Modal -->
-  <div class="modal fade" id="editListConfigModal" tabindex="-1" aria-labelledby="editListConfigModalLabel"
-       x-data="{ removeWinners: window.settings?.preventDuplicates ?? true, listId: null, listName: '' }">
-    <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="editListConfigModalLabel">
-            <i class="bi bi-gear me-2"></i>Edit List Settings
-          </h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label fw-bold">List Name</label>
-            <input type="text" class="form-control" id="editListName" x-model="listName">
-          </div>
-          <hr>
-          <h6 class="text-muted mb-3">Winner Behavior Settings</h6>
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="editRemoveWinnersFromList"
-                   x-model="removeWinners">
-            <label class="form-check-label" for="editRemoveWinnersFromList">
-              <strong>Remove winners from source list</strong>
-            </label>
-            <div class="form-text">When enabled, winners are removed from this list so they cannot win again.</div>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="editPreventWinningSamePrize"
-                   :checked="!removeWinners" :disabled="!removeWinners">
-            <label class="form-check-label" for="editPreventWinningSamePrize">
-              <strong>Prevent winning same prize twice</strong>
-            </label>
-            <div class="form-text">Auto-enabled when keeping winners in list. Prevents same person winning same prize type twice.</div>
-          </div>
-          <div class="alert alert-info mt-3" x-show="!removeWinners">
-            <i class="bi bi-info-circle me-2"></i>Winners will remain in list but cannot win the same prize twice.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" @click="Lists.saveListConfig(listId)">
-            <i class="bi bi-check-lg me-2"></i>Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Report Import Modal -->
   <div class="modal fade" id="reportImportModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-fullscreen-sm-down modal-dialog-scrollable">
@@ -2491,6 +2478,9 @@
         // General settings
         preventDuplicates: Alpine.$persist(false).as('settings_preventDuplicates'),
         preventSamePrize: Alpine.$persist(false).as('settings_preventSamePrize'),
+        // Default for newly imported lists only — each list stores its own value in
+        // metadata.listSettings.skipExistingWinners from then on.
+        skipExistingWinners: Alpine.$persist(false).as('settings_skipExistingWinners'),
         hideEntryCounts: Alpine.$persist(false).as('settings_hideEntryCounts'),
         enableDebugLogs: Alpine.$persist(false).as('settings_enableDebugLogs'),
         enableWebhook: Alpine.$persist(false).as('settings_enableWebhook'),
