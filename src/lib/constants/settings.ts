@@ -54,15 +54,27 @@ export const DEFAULT_SETTINGS: Settings = {
  * belongs would otherwise poison every comparison the draw makes against it, so a mismatch is
  * ignored and the default stands.
  */
+/**
+ * Keys that store a string but default to `null`.
+ *
+ * `typeof null` is `'object'`, so checking a value against the type of its own default rejected
+ * every string these keys exist to hold. All three load paths run through this guard, so a
+ * custom background applied the moment it was chosen and then vanished on the next load — the
+ * saved value was thrown away on the way back in, from localStorage, cache and server alike.
+ *
+ * A future nullable key that is not a string needs its own entry here rather than this list.
+ */
+const NULLABLE_STRING_KEYS: ReadonlySet<string> = new Set(['customBackgroundImage']);
+
 export function applySettingValue(target: Settings, key: string, value: unknown): boolean {
   if (!isSettingKey(key)) return false;
 
   const fallback = DEFAULT_SETTINGS[key];
-  const allowNull = fallback === null;
   if (value === null) {
-    if (!allowNull) return false;
-  } else if (typeof value !== typeof fallback) {
-    return false;
+    if (fallback !== null) return false;
+  } else {
+    const expected = NULLABLE_STRING_KEYS.has(key) ? 'string' : typeof fallback;
+    if (typeof value !== expected) return false;
   }
 
   // The one unavoidable cast in the settings pipeline, kept here so no caller repeats it.
