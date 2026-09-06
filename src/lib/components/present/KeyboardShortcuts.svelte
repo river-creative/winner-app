@@ -42,6 +42,31 @@
   let tooltipOpen = $state(false);
 
   /**
+   * The chip that confirms a shortcut fired.
+   *
+   * The public display has no other acknowledgement — most of these keys act on a screen the
+   * operator is not looking at, so without it a press that did nothing and a press that worked
+   * are indistinguishable. `flash` is bumped on every press so the element is replaced and the
+   * CSS animation restarts; re-pressing the same key otherwise showed nothing at all, because
+   * the text had not changed.
+   */
+  const FEEDBACK_MS = 600;
+
+  let feedbackKey = $state<string | null>(null);
+  let flash = $state(0);
+  let feedbackTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function showFeedback(key: string): void {
+    clearTimeout(feedbackTimer);
+    feedbackKey = key.toUpperCase();
+    flash += 1;
+    // Matches the animation's own length, so the element leaves as it finishes fading out.
+    feedbackTimer = setTimeout(() => (feedbackKey = null), FEEDBACK_MS);
+  }
+
+  $effect(() => () => clearTimeout(feedbackTimer));
+
+  /**
    * Never steal a keystroke from something the operator is typing into.
    *
    * Checked on both the event target and the active element: a keystroke normally targets the
@@ -80,10 +105,20 @@
 
     event.preventDefault();
     shortcut.run();
+    showFeedback(shortcut.key);
   }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
+
+<!-- `aria-hidden`: the shortcut's own effect is what a screen-reader user hears, and announcing
+     the letter they just pressed on top of it is noise. `{#key}` remounts on every press so the
+     animation replays. -->
+{#if feedbackKey}
+  {#key flash}
+    <div class="keyboard-feedback" aria-hidden="true">{feedbackKey}</div>
+  {/key}
+{/if}
 
 <!--
   The corner affordance the old app injected from JavaScript, using the CSS that was already

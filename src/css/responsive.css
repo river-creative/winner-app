@@ -235,13 +235,8 @@
     padding: 0.5rem 1rem;
   }
 
-  /* Alert Modal Mobile */
-  .alert-modal {
-    padding: 1.5rem;
-    margin: 0.5rem;
-    max-width: calc(100vw - 1rem);
-  }
-
+  /* Scanner alert, mobile. The panel is a <dialog> now and sizes with the other dialogs;
+     only its contents are sized here. */
   .alert-icon {
     width: 60px;
     height: 60px;
@@ -250,10 +245,6 @@
 
   .alert-icon i {
     font-size: 2rem;
-  }
-
-  .alert-title {
-    font-size: 1.25rem;
   }
 
   .alert-message {
@@ -265,11 +256,6 @@
     padding: 0.4rem 0.75rem;
   }
 
-  .alert-modal .btn {
-    min-width: 120px;
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
-  }
 }
 /* ============================================================================
    NEW RESPONSIVE LAYER
