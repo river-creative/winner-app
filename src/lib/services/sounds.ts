@@ -107,6 +107,19 @@ export function playBeep(frequency = 800, durationMs = 100): void {
 }
 
 /**
+ * What to call an uploaded sound in the pickers.
+ *
+ * The server stores uploads as `sound-<timestamp>-<original name>.mp3` so two files of the same
+ * name cannot collide. That prefix is storage bookkeeping, and showing it put
+ * "sound-1788707882985-walkthrough-tone" in three dropdowns where the operator had uploaded
+ * "walkthrough-tone.mp3". Stripping it back to the name they chose matches what the Alpine app
+ * stored, which was the filename minus its extension.
+ */
+export function uploadedSoundName(filename: string): string {
+  return filename.replace(/^sound-\d+-/, '').replace(/\.[^.]+$/, '');
+}
+
+/**
  * Fetch the sounds an operator has uploaded, and merge them with the built-ins.
  *
  * Uploads live in `data/uploads`, which is the persisted volume, so they survive a deploy —
@@ -120,8 +133,10 @@ export async function loadSounds(
     return [
       ...BUILT_IN_SOUNDS,
       ...uploaded.map((file) => ({
+        // The id stays the stored filename: it is what the sound settings persist, so changing
+        // it would unpick every saved selection.
         id: file.filename,
-        name: file.filename.replace(/\.[^.]+$/, ''),
+        name: uploadedSoundName(file.filename),
         url: file.url,
         source: 'uploaded' as const
       }))

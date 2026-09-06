@@ -1269,6 +1269,15 @@ body {
   margin-bottom: 0.5rem;
 }
 
+/* The last stat card holds a prize name rather than a count, and 2.5rem is a size chosen for
+   digits: "Walkthrough Bike" does not fit a 294px card at that size, so `overflow-wrap: anywhere`
+   broke it mid-word as "Walkthroug / h Bike". Sized to fit a name instead, and still allowed to
+   break a single word long enough to need it. */
+.stat-number.stat-number-text {
+  font-size: clamp(1rem, 1.6vw + 0.5rem, 1.6rem);
+  line-height: 1.2;
+}
+
 .stat-label {
   opacity: 0.9;
   font-size: 0.9rem;

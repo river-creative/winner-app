@@ -67,7 +67,7 @@
         <div class="stat-label">Avg Winners/Selection</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">{stats.mostUsedPrize}</div>
+        <div class="stat-number stat-number-text">{stats.mostUsedPrize}</div>
         <div class="stat-label">Most Used Prize</div>
       </div>
     </div>
