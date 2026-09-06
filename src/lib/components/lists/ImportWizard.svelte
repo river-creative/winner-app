@@ -65,6 +65,16 @@
   // svelte-ignore state_referenced_locally
   const firstRow = source.rows[0] ?? {};
 
+  /**
+   * The rows shown under the Record ID step.
+   *
+   * Ten is what the old app showed, and it is enough to answer the only question this step
+   * asks — which column identifies a record — without turning the dialog into a spreadsheet.
+   */
+  const PREVIEW_ROWS = 10;
+  // svelte-ignore state_referenced_locally
+  const previewRows = source.rows.slice(0, PREVIEW_ROWS);
+
   const detectedIdColumn = detectIdColumn(headers);
   const detectedNameTemplate = detectNameTemplate(headers);
 
@@ -364,6 +374,57 @@
                 <div class="form-text">Selected column values must be unique for each record.</div>
               </div>
             {/if}
+
+            <!--
+              The parsed rows, shown where the column that identifies a record is chosen — that
+              decision cannot be made from a list of header names alone.
+
+              Values are interpolated, so the compiler escapes them: the old app built this table
+              by concatenating cell values into an HTML string, and anything a spreadsheet
+              carried in a cell was parsed as markup and run. `?? ''` rather than `|| ''` so a
+              numeric 0 prints as the 0 that is in the file instead of an empty cell. Every cell
+              carries `data-label`, which is what lets responsive.css restack the table as one
+              labelled card per row on a phone.
+            -->
+            <div class="mt-4">
+              <span class="form-label d-block" id="import-data-preview-label">
+                Data Preview
+                <span class="text-muted fw-normal">
+                  — {formatNumber(source.rows.length)}
+                  {pluralise(source.rows.length, 'record')}, showing the first {previewRows.length}
+                </span>
+              </span>
+
+              <div class="table-responsive">
+                <!-- svelte-ignore a11y_no_redundant_roles -->
+                <table
+                  class="table table-sm table-striped table-stack mb-0"
+                  role="table"
+                  aria-labelledby="import-data-preview-label"
+                >
+                  <!-- svelte-ignore a11y_no_redundant_roles -->
+                  <thead role="rowgroup">
+                    <!-- svelte-ignore a11y_no_redundant_roles -->
+                    <tr role="row">
+                      {#each headers as header (header)}
+                        <th scope="col" role="columnheader">{header}</th>
+                      {/each}
+                    </tr>
+                  </thead>
+                  <!-- svelte-ignore a11y_no_redundant_roles -->
+                  <tbody role="rowgroup">
+                    {#each previewRows as row, index (index)}
+                      <!-- svelte-ignore a11y_no_redundant_roles -->
+                      <tr role="row">
+                        {#each headers as header (header)}
+                          <td role="cell" data-label={header}>{row[header] ?? ''}</td>
+                        {/each}
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           {:else if step === 2}
             <p class="text-muted mb-4">Configure how records should be processed during import.</p>
 
