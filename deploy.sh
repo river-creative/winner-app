@@ -97,7 +97,23 @@ echo -e "${GREEN}✅ Preflight passed — compose file and all required env vars
 # ---------------------------------------------------------------------------
 echo -e "${YELLOW}📁 Syncing files to server...${NC}"
 
-# No --delete: compose.yml and .env live only on the server and must survive.
+# --delete, because not deleting once shipped the wrong application. The Svelte
+# migration removed vite.config.js and replaced it with vite.config.ts; without
+# --delete the old file stayed behind, and Vite resolves .js ahead of .ts, so the
+# build inside the image rebuilt the PREVIOUS app. Container healthy, login page
+# 200, every signal green — and the old app serving. Anything this repo deletes
+# has to leave the server too, or the next rename becomes the same outage.
+#
+# What must survive is therefore listed explicitly rather than left to luck.
+# rsync does not delete excluded paths, so each --exclude below is also a
+# protection:
+#   compose.yml  host-specific stack definition, not in this repo (see header)
+#   .env*        the live secrets AND their dated backups (.env.bak-YYYYMMDD-…)
+#   data/        the live JSON collections and uploads
+#   dist/        rebuilt inside the image; never shipped from here
+#   node_modules installed in the image, not synced
+# --delete-after runs the removals only once every file has transferred, so a
+# connection lost mid-sync cannot leave the tree short of both old and new.
 #
 # --rsync-path="sudo rsync": the deploying user is a member of srvdev, not root,
 # but the existing tree is root-owned from earlier root-run deploys. Writing new
@@ -106,7 +122,7 @@ echo -e "${YELLOW}📁 Syncing files to server...${NC}"
 # exits 23 — aborting a deploy whose file contents transferred perfectly well.
 # Running the remote side under sudo keeps full -a semantics and leaves ownership
 # consistent with the rest of the tree.
-rsync -avz --rsync-path="sudo rsync" \
+rsync -avz --delete --delete-after --rsync-path="sudo rsync" \
     --exclude 'node_modules' \
     --exclude '.git' \
     --exclude '.claude' \
@@ -114,7 +130,8 @@ rsync -avz --rsync-path="sudo rsync" \
     --exclude '.DS_Store' \
     --exclude '*.log' \
     --exclude 'dist/' \
-    --exclude '.env' \
+    --exclude '.env*' \
+    --exclude 'compose.yml' \
     "${LOCAL_PATH}" "${SERVER}:${REMOTE_PATH}/"
 
 echo -e "${GREEN}✅ Files synced successfully${NC}"
@@ -166,11 +183,28 @@ echo -e "${GREEN}✅ Container is running${NC}"
 # Step 3: Verify the deployed app actually answers
 # ---------------------------------------------------------------------------
 echo -e "${YELLOW}🌐 Verifying https://win.revival.com ...${NC}"
-code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 https://win.revival.com/login || echo 000)
-if [ "${code}" = "200" ]; then
-    echo -e "${GREEN}✅ Login page responded 200${NC}"
-else
+body=$(curl -s --max-time 20 -w '\n%{http_code}' https://win.revival.com/login || printf '\n000')
+code=${body##*$'\n'}
+body=${body%$'\n'*}
+
+if [ "${code}" != "200" ]; then
     echo -e "${RED}⚠️  Login page returned ${code} — check Traefik and the container logs${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✅ Login page responded 200${NC}"
+
+# A 200 only proves something answered — it does not prove WHICH app. A stale
+# vite.config.js once had this deploy build and serve the previous application
+# behind a perfectly healthy container, and every check up to here passed.
+# SvelteKit stamps its hashed bundle paths into the shell, so their absence
+# means the served app is not the one in this repo.
+if printf '%s' "${body}" | grep -q '_app/immutable'; then
+    echo -e "${GREEN}✅ Served app is the SvelteKit build${NC}"
+else
+    echo -e "${RED}❌ Login page answered, but it is NOT the SvelteKit build${NC}"
+    echo -e "${RED}   No _app/immutable bundle reference in the served HTML.${NC}"
+    echo -e "${RED}   A superseded config or entry point is probably still on the server —${NC}"
+    echo -e "${RED}   compare ${REMOTE_PATH} against this repo before retrying.${NC}"
     exit 1
 fi
 
