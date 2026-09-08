@@ -28,10 +28,26 @@ export interface Rgb {
   b: number;
 }
 
-/** The confetti's non-theme accent, and the colour of the coins. Not a theme colour. */
+/** The confetti's non-theme accent, and the base colour of the coins. Not a theme colour. */
 const GOLD: Rgb = { r: 255, g: 215, b: 0 };
-const GOLD_RIM = '#ffa500';
-const GOLD_SHINE = '#ffff99';
+
+/**
+ * The coin's palette, light to dark.
+ *
+ * Metal reads as metal because of the *range* between its lit and unlit faces, not because of its
+ * hue. A single flat yellow with a lighter blob on it is a bubble; these five stops across a
+ * gradient, a dark rim and a narrow specular streak are what make the same shape read as struck
+ * gold. The rim in particular used to be `#ffa500` — lighter than parts of the face it bordered,
+ * which flattened the disc rather than raising it.
+ */
+const GOLD_HIGHLIGHT = '#fff6c9';
+const GOLD_LIGHT = '#ffdf6b';
+const GOLD_MID = '#f0b429';
+const GOLD_DEEP = '#c07c12';
+const GOLD_RIM = '#7d5008';
+/** The milled edge seen when a coin turns side-on, and the raised border on its face. */
+const GOLD_EDGE = '#b8770f';
+const GOLD_SHINE = '#fffdf2';
 
 /** Used only when a custom property is missing or unparseable — the shipped default theme. */
 const FALLBACK_PRIMARY: Rgb = { r: 99, g: 102, b: 241 };
@@ -728,13 +744,32 @@ interface Coin {
   vx: number;
   vy: number;
   size: number;
+  /**
+   * The spin, in radians. The coin's width is its cosine, so it flips edge-on and back.
+   *
+   * The old code passed this to `ctx.rotate()` around a circle, which is a visual no-op — the
+   * coins were spinning the whole time and nothing on screen moved.
+   */
   rotation: number;
   rotationSpeed: number;
+  /** A fixed lean, so a burst does not flip in formation like a rack of the same coin. */
+  tilt: number;
+  /**
+   * Built once, at spawn.
+   *
+   * Gradient coordinates are resolved against the transform in force when the gradient is
+   * *painted*, so one built in coin-local space follows its coin — translation, lean and flip —
+   * for the whole two seconds. Rebuilding it per frame would mean up to four hundred
+   * `createLinearGradient` calls every frame, which is the cost this canvas exists to avoid.
+   */
+  face: CanvasGradient;
   life: number;
 }
 
 const CONFETTI_LIFE = 200;
 const COIN_LIFE = 120;
+/** The share of a coin's life spent fading out. Before that it is fully opaque, like metal. */
+const COIN_FADE = 0.35;
 const CONFETTI_BATCH_MS = 100;
 
 /**
@@ -743,6 +778,22 @@ const CONFETTI_BATCH_MS = 100;
  * so it only ever bites during that window.
  */
 const MAX_COINS = 400;
+
+/**
+ * The lit-to-unlit ramp across a coin's face, built in coin-local coordinates.
+ *
+ * Diagonal rather than straight down, so the lit edge sits opposite the specular streak and the
+ * disc reads as curved. It is painted after the coin's lean and flip are applied, so the light
+ * appears to stay put while the coin turns under it.
+ */
+function goldFace(ctx: CanvasRenderingContext2D, size: number): CanvasGradient {
+  const gradient = ctx.createLinearGradient(-size, -size, size * 0.8, size);
+  gradient.addColorStop(0, GOLD_HIGHLIGHT);
+  gradient.addColorStop(0.28, GOLD_LIGHT);
+  gradient.addColorStop(0.62, GOLD_MID);
+  gradient.addColorStop(1, GOLD_DEEP);
+  return gradient;
+}
 
 export interface CelebrationAnimator {
   /** Rain confetti, spawning new pieces for `durationMs`. Existing pieces fall out naturally. */
@@ -821,21 +872,45 @@ export function createCelebrationAnimator(canvas: HTMLCanvasElement): Celebratio
 
       ctx.save();
       ctx.translate(coin.x, coin.y);
-      ctx.rotate(coin.rotation);
-      ctx.globalAlpha = Math.max(0, coin.life / COIN_LIFE);
+      ctx.rotate(coin.tilt);
+      // Solid for most of its life, then fades. Translucent from the moment it appears is the
+      // other half of why these read as bubbles.
+      ctx.globalAlpha = Math.min(1, Math.max(0, coin.life / (COIN_LIFE * COIN_FADE)));
+
+      // The flip. A circle looks identical however far you rotate it, so the width has to change:
+      // at cos = ±1 the coin faces the room, at 0 it is edge-on.
+      const half = Math.abs(Math.cos(coin.rotation)) * coin.size;
+      // Edge-on it collapses to its own thickness rather than disappearing into a hairline.
+      const thickness = coin.size * 0.17;
+      const width = Math.max(half, thickness);
+      const faceOn = half > thickness;
 
       ctx.beginPath();
-      ctx.arc(0, 0, coin.size, 0, TAU);
-      ctx.fillStyle = rgba(GOLD, 1);
+      ctx.ellipse(0, 0, width, coin.size, 0, 0, TAU);
+      ctx.fillStyle = faceOn ? coin.face : GOLD_EDGE;
       ctx.fill();
+      ctx.lineWidth = Math.max(1, coin.size * 0.09);
       ctx.strokeStyle = GOLD_RIM;
-      ctx.lineWidth = 2;
       ctx.stroke();
 
+      // The raised border struck into the face. Dropped as the coin turns away: at that width it
+      // sits on top of the rim and only muddies it.
+      if (half > coin.size * 0.38) {
+        ctx.beginPath();
+        ctx.ellipse(0, 0, width * 0.66, coin.size * 0.66, 0, 0, TAU);
+        ctx.lineWidth = Math.max(1, coin.size * 0.07);
+        ctx.strokeStyle = GOLD_EDGE;
+        ctx.stroke();
+      }
+
+      // A specular streak along one edge — an arc, where the old blob was a filled circle sitting
+      // in from the edge like the highlight on a soap bubble.
       ctx.beginPath();
-      ctx.arc(-coin.size * 0.3, -coin.size * 0.3, coin.size * 0.3, 0, TAU);
-      ctx.fillStyle = GOLD_SHINE;
-      ctx.fill();
+      ctx.ellipse(0, 0, width * 0.8, coin.size * 0.8, 0, Math.PI * 1.06, Math.PI * 1.54);
+      ctx.lineWidth = Math.max(1, coin.size * 0.13);
+      ctx.strokeStyle = GOLD_SHINE;
+      ctx.stroke();
+
       ctx.restore();
 
       if (coin.life <= 0) coinPieces.splice(index, 1);
@@ -889,14 +964,20 @@ export function createCelebrationAnimator(canvas: HTMLCanvasElement): Celebratio
       if (coinPieces.length >= MAX_COINS) return;
       const count = 8 + Math.floor(Math.random() * 5);
       for (let index = 0; index < count; index++) {
+        const size = Math.random() * 8 + 8;
         coinPieces.push({
           x,
           y,
           vx: (Math.random() - 0.5) * 8,
           vy: -Math.random() * 8 - 3,
-          size: Math.random() * 8 + 6,
-          rotation: 0,
-          rotationSpeed: (Math.random() - 0.5) * 0.3,
+          size,
+          // Every coin starts at its own point in the flip. They all started at 0 before, so a
+          // burst turned in perfect unison — which is the tell that they are drawn, not thrown.
+          rotation: Math.random() * TAU,
+          // Signed, and never near zero: a coin whose spin rounds to nothing just hangs there.
+          rotationSpeed: (0.11 + Math.random() * 0.14) * (Math.random() < 0.5 ? -1 : 1),
+          tilt: (Math.random() - 0.5) * 0.9,
+          face: goldFace(surface.ctx, size),
           life: COIN_LIFE
         });
       }
