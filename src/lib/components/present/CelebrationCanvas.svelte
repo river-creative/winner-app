@@ -55,12 +55,26 @@
     const key = autoKey;
 
     const fromPreview = token !== lastPreviewToken;
-    const fromDraw = key !== '' && key !== lastAutoKey;
+    const keyChanged = key !== lastAutoKey;
     lastPreviewToken = token;
     lastAutoKey = key;
 
-    if (!fromPreview && !fromDraw) return;
-    untrack(() => celebrate(fromPreview));
+    if (fromPreview) {
+      untrack(() => celebrate(true));
+      return;
+    }
+    if (!keyChanged) return;
+
+    // The key emptying means the draw that owned this celebration is gone — the operator reset,
+    // or undid it, and the next draw is about to start. Clearing only when the *next*
+    // celebration began left coins from the last one raining over the new countdown and over
+    // "Preparing winners…", because nothing between those two moments ever stopped them.
+    if (key === '') {
+      untrack(() => animator?.clear());
+      return;
+    }
+
+    untrack(() => celebrate(false));
   });
 
   /**
@@ -94,8 +108,15 @@
     const target = animator;
     if (!target) return;
 
-    // A new draw replaces the previous celebration rather than layering on top of it.
-    target.clear();
+    // Only the preview clears here, and only so repeated presses of "Test Celebration" replace
+    // each other rather than piling up.
+    //
+    // A draw must NOT clear at this point. Its coins are fired by the reveal effect below, which
+    // Svelte runs in the same flush as this one — so clearing here would wipe the coins of the
+    // very draw being celebrated, and whether it did would depend on nothing more than the order
+    // the two effects happen to be declared in. The previous draw's particles are already gone:
+    // they were dropped when its key emptied, which is a strictly earlier flush.
+    if (fromPreview) target.clear();
 
     const effect = settings.current.celebrationEffect;
     if (effect === 'none') return;
