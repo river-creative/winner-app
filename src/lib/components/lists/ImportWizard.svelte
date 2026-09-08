@@ -1,11 +1,22 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import Dialog from '$lib/components/Dialog.svelte';
-  import { buildList, entryIdFor, existingWinnerIds, saveList, type ImportSource } from '$lib/services/lists';
+  import {
+    buildList,
+    entryIdFor,
+    existingWinnerIds,
+    listAsImportSource,
+    saveList,
+    saveListConfig,
+    skipsExistingWinners,
+    type WizardTarget
+  } from '$lib/services/lists';
   import { data } from '$lib/state/data.svelte';
   import { settings } from '$lib/state/settings.svelte';
+  import { removesWinners } from '$lib/state/setup.svelte';
   import { toasts } from '$lib/state/toasts.svelte';
-  import type { IdConfig } from '$lib/types';
+  import { ui } from '$lib/state/ui.svelte';
+  import type { IdConfig, List } from '$lib/types';
   import { detectIdColumn, detectNameTemplate, validateColumnIds } from '$lib/utils/csv';
   import { applyTemplate, formatNumber, pluralise } from '$lib/utils/format';
   import WinnerBehaviourFields from './WinnerBehaviourFields.svelte';
@@ -13,23 +24,52 @@
   /** Kept out of the markup because a bare `{` in an attribute starts a Svelte expression. */
   const NAME_TEMPLATE_PLACEHOLDER = '{lastName}, {firstName}';
 
+  /**
+   * Shown where the field chips would be. Reachable only from the edit flow, on a list with no
+   * entries: an import always has rows, but a list can be left empty by a hand-edited data file
+   * or a restore, and refusing to open the wizard for it would mean it could no longer even be
+   * renamed.
+   */
+  const NO_FIELDS_NOTE = 'This list has no fields, so there is nothing to insert.';
+
   interface Props {
     /**
-     * The rows to import. Read once at creation — the parent wraps this component in `{#key}` so
-     * a second import always gets a fresh instance rather than these fields being re-seeded by
-     * an effect.
+     * What is being configured: a pending import, or a list that already exists.
+     *
+     * Read once at creation — the parent wraps this component in `{#key}` so a second target
+     * always gets a fresh instance rather than these fields being re-seeded by an effect.
      */
-    source: ImportSource;
+    target: WizardTarget;
     onclose: () => void;
   }
 
-  let { source, onclose }: Props = $props();
+  let { target, onclose }: Props = $props();
+
+  /**
+   * The two flows this one wizard serves.
+   *
+   * The gear on a list card opens exactly the same five steps the import does, pre-filled from
+   * the list — so the edit flow turns its list into the same `ImportSource` shape and every
+   * derivation below is written once. `editing` is the list when editing and null when
+   * importing, which is the only thing the rest of the component tests.
+   */
+  // svelte-ignore state_referenced_locally
+  const editing: List | null = target.mode === 'edit' ? target.list : null;
+  // svelte-ignore state_referenced_locally
+  const source = target.mode === 'edit' ? listAsImportSource(target.list) : target.source;
 
   let open = $state(true);
 
   const STEPS = [
     { number: 1, label: 'Record ID', icon: 'bi-key', title: 'Record ID Configuration' },
-    { number: 2, label: 'Import Options', icon: 'bi-filter', title: 'Import Options' },
+    {
+      number: 2,
+      // Its one setting governs records added by an import *and* by a later sync, so "Import
+      // Options" is only half true for a list that has already been imported.
+      label: editing ? 'Record Options' : 'Import Options',
+      icon: 'bi-filter',
+      title: editing ? 'Record Options' : 'Import Options'
+    },
     { number: 3, label: 'Winner Behavior', icon: 'bi-trophy', title: 'Winner Behavior' },
     { number: 4, label: 'Display Name', icon: 'bi-person-badge', title: 'Display Name' },
     { number: 5, label: 'Card Display', icon: 'bi-card-heading', title: 'Winner Card Display' }
@@ -37,7 +77,8 @@
   const TOTAL_STEPS = STEPS.length;
 
   let step = $state(1);
-  let importing = $state(false);
+  /** A write is in flight — an import or a settings save. Both lock the same controls. */
+  let busy = $state(false);
 
   /**
    * Import progress is reported inside this dialog rather than through `ui.withProgress`.
@@ -56,13 +97,11 @@
 
   /*
    * `source` is read once, on purpose: it is the fixed input to this wizard run, and every field
-   * below is seeded from it. The parent wraps this component in `{#key source}`, so a second
-   * import destroys and rebuilds it rather than mutating a run already in progress — which is
-   * what makes reading the initial value correct rather than a missed reactive dependency.
+   * below is seeded from it. The parent wraps this component in `{#key}`, so a second target
+   * destroys and rebuilds it rather than mutating a run already in progress — which is what
+   * makes reading the initial value correct rather than a missed reactive dependency.
    */
-  // svelte-ignore state_referenced_locally
   const headers = source.headers;
-  // svelte-ignore state_referenced_locally
   const firstRow = source.rows[0] ?? {};
 
   /**
@@ -72,14 +111,18 @@
    * asks — which column identifies a record — without turning the dialog into a spreadsheet.
    */
   const PREVIEW_ROWS = 10;
-  // svelte-ignore state_referenced_locally
   const previewRows = source.rows.slice(0, PREVIEW_ROWS);
 
   const detectedIdColumn = detectIdColumn(headers);
   const detectedNameTemplate = detectNameTemplate(headers);
 
-  // svelte-ignore state_referenced_locally
   let listName = $state(source.listName);
+
+  /*
+   * Every field below seeds from the list when editing and from detection when importing. A
+   * list saved before a given field existed falls through to the detected default rather than
+   * opening with an empty control — `nameConfig` and `infoConfig` predate neither wizard.
+   */
 
   /**
    * Defaults to auto-generated ids when no column looks like one.
@@ -87,21 +130,54 @@
    * The old form defaulted to "use a column" with nothing selected, so an operator who pressed
    * "Use Defaults" on a file with no id column got a validation error instead of an import.
    */
-  let idSource = $state<'auto' | 'column'>(detectedIdColumn ? 'column' : 'auto');
-  let idColumn = $state(detectedIdColumn ?? '');
-  let idAutoSelected = $state(detectedIdColumn !== undefined);
+  let idSource = $state<'auto' | 'column'>(
+    editing ? (editing.metadata.idConfig?.source ?? 'auto') : detectedIdColumn ? 'column' : 'auto'
+  );
+  let idColumn = $state(editing ? (editing.metadata.idConfig?.column ?? '') : (detectedIdColumn ?? ''));
+  /** The badge claims a *guess*. An existing list's column is its own, so it never applies. */
+  let idAutoSelected = $state(!editing && detectedIdColumn !== undefined);
 
-  let skipExistingWinners = $state(settings.current.skipExistingWinners);
-  let removeWinners = $state(settings.current.preventDuplicates);
-  let preventSamePrize = $state(settings.current.preventSamePrize);
+  /**
+   * The stored id column may no longer be one of the list's fields — an MP query that dropped
+   * it, say. The picker is read-only when editing, so without an option of its own the one
+   * thing this step exists to show would render blank for exactly the lists where it matters.
+   */
+  const idColumnMissing = $derived(editing !== null && idColumn !== '' && !headers.includes(idColumn));
 
-  let nameTemplate = $state(detectedNameTemplate);
+  /** Rows are a file's *records* while importing, and the list's *entries* while editing. */
+  function countLabel(count: number): string {
+    return editing
+      ? `${formatNumber(count)} ${pluralise(count, 'entry', 'entries')}`
+      : `${formatNumber(count)} ${pluralise(count, 'record')}`;
+  }
+
+  // Seeded from the global default on import; from then on the list owns its value, and the
+  // global is only what a *new* list starts from.
+  let skipExistingWinners = $state(
+    editing
+      ? skipsExistingWinners(editing, settings.current.skipExistingWinners)
+      : settings.current.skipExistingWinners
+  );
+  let removeWinners = $state(editing ? removesWinners(editing) : settings.current.preventDuplicates);
+  /*
+   * The *stored* value, not a fresh default: the dialog this wizard replaced always opened this
+   * unchecked and wrote back whatever it found, so opening a list's settings and pressing Save
+   * silently cleared the flag.
+   */
+  let preventSamePrize = $state(
+    editing
+      ? (editing.metadata.listSettings?.preventWinningSamePrize ?? settings.current.preventSamePrize)
+      : settings.current.preventSamePrize
+  );
+
+  let nameTemplate = $state(editing?.metadata.nameConfig || detectedNameTemplate);
 
   // info1 names the record, info2 repeats the display name, info3 is left for the operator —
-  // the same defaults the Alpine form seeded.
-  let info1 = $state(detectedIdColumn ? `{${detectedIdColumn}}` : headers[0] ? `{${headers[0]}}` : '');
-  let info2 = $state(detectedNameTemplate);
-  let info3 = $state('');
+  // the same defaults the Alpine form seeded. `??`, so a stored empty field stays empty.
+  const detectedInfo1 = detectedIdColumn ? `{${detectedIdColumn}}` : headers[0] ? `{${headers[0]}}` : '';
+  let info1 = $state(editing?.metadata.infoConfig?.info1 ?? detectedInfo1);
+  let info2 = $state(editing?.metadata.infoConfig?.info2 ?? detectedNameTemplate);
+  let info3 = $state(editing?.metadata.infoConfig?.info3 ?? '');
 
   let nameInput = $state<HTMLInputElement>();
   let info1Input = $state<HTMLInputElement>();
@@ -152,14 +228,128 @@
     }
   }
 
-  function setSkipExistingWinners(checked: boolean) {
-    skipExistingWinners = checked;
-    // The checkbox is also the global preference, exactly as the old form treated it.
-    settings.set('skipExistingWinners', checked);
+  /**
+   * Everything the operator can change, in one comparable shape.
+   *
+   * Built from the values that would be *written*, not from the controls: `preventSamePrize` is
+   * forced on for a list that keeps its winners, so unticking "remove winners" changes what a
+   * save would store even though that checkbox itself was never touched. Comparing the whole
+   * shape also means a field added to this wizard later cannot be forgotten here.
+   */
+  const editable = $derived({
+    listName: listName.trim(),
+    idSource,
+    idColumn,
+    skipExistingWinners,
+    removeWinners,
+    preventSamePrize: removeWinners ? preventSamePrize : true,
+    nameTemplate: nameTemplate.trim(),
+    info1: info1.trim(),
+    info2: info2.trim(),
+    info3: info3.trim()
+  });
+  // svelte-ignore state_referenced_locally
+  const initialEditable = JSON.stringify(editable);
+  const dirty = $derived(JSON.stringify(editable) !== initialEditable);
+
+  /**
+   * Guards against a second prompt while the first is still on screen. A plain variable, not
+   * `$state`: nothing renders it, and reactivity it does not need is reactivity that can
+   * re-trigger something that does.
+   */
+  let confirmingClose = false;
+
+  /**
+   * Every dismissal the operator can reach — Escape, the backdrop, the × and Cancel — arrives
+   * here, because `Dialog` writes its `open` prop through the setter bound below. So the guard
+   * cannot be walked around, while the import and save paths, which assign `open` directly, are
+   * deliberately never asked.
+   */
+  async function requestClose() {
+    // A write is in flight. Cancel is disabled for it, and Escape must not be a way around that.
+    if (busy || confirmingClose) return;
+
+    if (dirty) {
+      confirmingClose = true;
+      try {
+        const discard = await ui.confirm(
+          editing
+            ? {
+                title: 'Discard Changes',
+                message: `"${editing.metadata.name}" has unsaved changes.`,
+                details: ['Closing now leaves the list exactly as it is.'],
+                confirmText: 'Discard',
+                cancelText: 'Keep Editing',
+                variant: 'warning'
+              }
+            : {
+                title: 'Discard Import',
+                message: 'Nothing has been imported yet.',
+                details: [
+                  `Closing now discards this configuration and the ${countLabel(source.rows.length)}${
+                    source.fileName ? ` from ${source.fileName}` : ''
+                  }.`
+                ],
+                confirmText: 'Discard',
+                cancelText: 'Keep Configuring',
+                variant: 'warning'
+              }
+        );
+        if (!discard) return;
+      } finally {
+        confirmingClose = false;
+      }
+    }
+
+    open = false;
+  }
+
+  /** The footer's commit button, which saves a list's settings or runs the import. */
+  function commit() {
+    if (editing) void saveConfig(editing);
+    else void runImport();
+  }
+
+  /**
+   * Write the wizard back onto an existing list.
+   *
+   * Metadata only — see `saveListConfig`. The record ID step is read-only precisely so that this
+   * can never need to touch entries.
+   */
+  async function saveConfig(list: List) {
+    if (busy) return;
+
+    const finalName = listName.trim();
+    if (!finalName) {
+      toasts.warning('Please give the list a name.');
+      return;
+    }
+
+    busy = true;
+    try {
+      await saveListConfig(list, {
+        name: finalName,
+        nameConfig: nameTemplate.trim(),
+        infoConfig: { info1: info1.trim(), info2: info2.trim(), info3: info3.trim() },
+        listSettings: {
+          removeWinnersFromList: removeWinners,
+          // Forced on for a list that keeps its winners — see WinnerBehaviourFields.
+          preventWinningSamePrize: removeWinners ? preventSamePrize : true,
+          skipExistingWinners
+        }
+      });
+
+      toasts.success(`Settings saved for "${finalName}".`);
+      open = false;
+    } catch (error) {
+      data.reportWriteFailure(error, 'the list settings');
+    } finally {
+      busy = false;
+    }
   }
 
   async function runImport() {
-    if (importing) return;
+    if (busy) return;
 
     const idConfig: IdConfig =
       idSource === 'column' ? { source: 'column', column: idColumn } : { source: 'auto' };
@@ -184,7 +374,7 @@
       return;
     }
 
-    importing = true;
+    busy = true;
     report(10, 'Preparing records…');
     try {
       /*
@@ -225,7 +415,10 @@
         listSettings: {
           removeWinnersFromList: removeWinners,
           // Forced on for a list that keeps its winners — see WinnerBehaviourFields.
-          preventWinningSamePrize: removeWinners ? preventSamePrize : true
+          preventWinningSamePrize: removeWinners ? preventSamePrize : true,
+          // Stored per list from here on. The global setting supplied the value this checkbox
+          // opened with and is deliberately not written back.
+          skipExistingWinners
         },
         mpSource: source.mpSource
       });
@@ -245,12 +438,27 @@
     } catch (error) {
       toasts.fromError(error, 'Could not import the list. Nothing was saved.');
     } finally {
-      importing = false;
+      busy = false;
     }
   }
 </script>
 
-<Dialog bind:open title="Configure Import" size="modal-xl" {onclose}>
+<!--
+  `open` is bound through a setter so every dismissal `Dialog` performs — Escape, the backdrop
+  and the × — is routed through the unsaved-changes guard. The wizard's own writes assign `open`
+  directly and so are never asked.
+-->
+<Dialog
+  bind:open={
+    () => open,
+    (value) => {
+      if (!value) void requestClose();
+    }
+  }
+  title={editing ? `Edit Settings — ${editing.metadata.name}` : 'Configure Import'}
+  size="modal-xl"
+  {onclose}
+>
   <div class="import-wizard">
     <div class="mb-3">
       <label for="import-list-name" class="form-label">List Name</label>
@@ -262,8 +470,11 @@
         bind:value={listName}
       />
       <div class="form-text">
-        {formatNumber(source.rows.length)}
-        {pluralise(source.rows.length, 'record')} from {source.fileName}
+        {#if editing}
+          Renaming the list here does not affect its entries or its winner history.
+        {:else}
+          {countLabel(source.rows.length)} from {source.fileName}
+        {/if}
       </div>
     </div>
 
@@ -311,7 +522,28 @@
           {#if step === 1}
             <p class="text-muted mb-4">Configure how each record is uniquely identified.</p>
 
-            <fieldset class="mb-3">
+            <!--
+              Read-only when editing, and shown rather than hidden: an operator has to be able to
+              see what a list is keyed by. Changing it cannot be made safe once entries exist —
+              leave the ids alone and the next sync keys new records by a different column,
+              matches nothing and re-adds everyone as duplicates; re-key them and every
+              `winners.entryId` pointing at this list dangles.
+
+              A disabled control is out of the tab order, so this visible note — placed before
+              the controls, so it is read first — is what carries the reason; `aria-describedby`
+              on each control is the belt to its braces.
+            -->
+            {#if editing}
+              <div class="alert alert-secondary py-2" id="import-id-locked">
+                <small>
+                  <i class="bi bi-lock me-1" aria-hidden="true"></i>
+                  The record ID is set when a list is imported and cannot be changed afterwards — entries are keyed
+                  by it and winner history refers to those keys. Re-import the list to change it.
+                </small>
+              </div>
+            {/if}
+
+            <fieldset class="mb-3" disabled={editing !== null}>
               <legend class="form-label">Record ID Source</legend>
 
               <div class="form-check">
@@ -322,6 +554,7 @@
                   id="import-id-auto"
                   value="auto"
                   checked={idSource === 'auto'}
+                  aria-describedby={editing ? 'import-id-locked' : undefined}
                   onchange={() => (idSource = 'auto')}
                 />
                 <label class="form-check-label" for="import-id-auto"> Auto-generate unique IDs </label>
@@ -336,6 +569,7 @@
                   id="import-id-column"
                   value="column"
                   checked={idSource === 'column'}
+                  aria-describedby={editing ? 'import-id-locked' : undefined}
                   onchange={() => (idSource = 'column')}
                 />
                 <label class="form-check-label" for="import-id-column"> Use column as record ID </label>
@@ -359,6 +593,8 @@
                   id="import-id-column-select"
                   class="form-select"
                   value={idColumn}
+                  disabled={editing !== null}
+                  aria-describedby={editing ? 'import-id-locked' : undefined}
                   onchange={(event) => {
                     idColumn = event.currentTarget.value;
                     // The badge only ever claims the *initial* guess, so the first manual
@@ -370,6 +606,9 @@
                   {#each headers as header (header)}
                     <option value={header}>{header}</option>
                   {/each}
+                  {#if idColumnMissing}
+                    <option value={idColumn}>{idColumn} (no longer in this list)</option>
+                  {/if}
                 </select>
                 <div class="form-text">Selected column values must be unique for each record.</div>
               </div>
@@ -390,69 +629,76 @@
               <span class="form-label d-block" id="import-data-preview-label">
                 Data Preview
                 <span class="text-muted fw-normal">
-                  — {formatNumber(source.rows.length)}
-                  {pluralise(source.rows.length, 'record')}, showing the first {previewRows.length}
+                  {#if previewRows.length > 0}
+                    — {countLabel(source.rows.length)}, showing the first {previewRows.length}
+                  {/if}
                 </span>
               </span>
 
-              <div class="table-responsive">
-                <!-- svelte-ignore a11y_no_redundant_roles -->
-                <table
-                  class="table table-sm table-striped table-stack mb-0"
-                  role="table"
-                  aria-labelledby="import-data-preview-label"
-                >
+              {#if previewRows.length === 0}
+                <!-- Only reachable when editing: an import cannot start with no rows. -->
+                <p class="text-muted mb-0">This list has no entries, so there is nothing to preview.</p>
+              {:else}
+                <div class="table-responsive">
                   <!-- svelte-ignore a11y_no_redundant_roles -->
-                  <thead role="rowgroup">
+                  <table
+                    class="table table-sm table-striped table-stack mb-0"
+                    role="table"
+                    aria-labelledby="import-data-preview-label"
+                  >
                     <!-- svelte-ignore a11y_no_redundant_roles -->
-                    <tr role="row">
-                      {#each headers as header (header)}
-                        <th scope="col" role="columnheader">{header}</th>
-                      {/each}
-                    </tr>
-                  </thead>
-                  <!-- svelte-ignore a11y_no_redundant_roles -->
-                  <tbody role="rowgroup">
-                    {#each previewRows as row, index (index)}
+                    <thead role="rowgroup">
                       <!-- svelte-ignore a11y_no_redundant_roles -->
                       <tr role="row">
                         {#each headers as header (header)}
-                          <td role="cell" data-label={header}>{row[header] ?? ''}</td>
+                          <th scope="col" role="columnheader">{header}</th>
                         {/each}
                       </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <!-- svelte-ignore a11y_no_redundant_roles -->
+                    <tbody role="rowgroup">
+                      {#each previewRows as row, index (index)}
+                        <!-- svelte-ignore a11y_no_redundant_roles -->
+                        <tr role="row">
+                          {#each headers as header (header)}
+                            <td role="cell" data-label={header}>{row[header] ?? ''}</td>
+                          {/each}
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                </div>
+              {/if}
             </div>
           {:else if step === 2}
-            <p class="text-muted mb-4">Configure how records should be processed during import.</p>
+            <p class="text-muted mb-4">Configure how records are handled when they are added to this list.</p>
 
+            <!--
+              A per-list setting, not the global one. The Settings screen holds the default a new
+              import opens with; from then on the list owns its value, so toggling it here can
+              never change how a later import of a different list behaves.
+            -->
             <div class="form-check mb-3">
               <input
                 class="form-check-input"
                 type="checkbox"
                 id="import-skip-winners"
-                checked={skipExistingWinners}
-                onchange={(event) => setSkipExistingWinners(event.currentTarget.checked)}
+                bind:checked={skipExistingWinners}
               />
               <label class="form-check-label" for="import-skip-winners">
                 Skip records that are already in the winner list
               </label>
               <div class="form-text">
-                Records are matched by their unique ID. Records with the same name but different IDs will
-                still be uploaded.
+                Records are matched by their unique ID. Records with the same name but different IDs are still
+                added. Also applies when this list is synced from Ministry Platform.
               </div>
             </div>
           {:else if step === 3}
             <p class="text-muted mb-4">Configure how winners are handled after selection.</p>
 
-            <WinnerBehaviourFields
-              idPrefix="import"
-              bind:removeWinners
-              bind:preventSamePrize
-              noticeVariant="warning"
-            />
+            <!-- One prefix for the whole wizard, whichever flow opened it: every other control
+                 in this file is `import-*` too, and these ids are never referenced from outside. -->
+            <WinnerBehaviourFields idPrefix="import" bind:removeWinners bind:preventSamePrize />
           {:else if step === 4}
             <p class="text-muted mb-4">
               Configure how names are displayed in lists. Click a field below to insert it at the cursor.
@@ -498,6 +744,9 @@
                   >
                     {header}
                   </button>
+                {:else}
+                  <!-- Only reachable when editing a list with no entries to take fields from. -->
+                  <p class="text-muted mb-0">{NO_FIELDS_NOTE}</p>
                 {/each}
               </div>
             </div>
@@ -568,9 +817,13 @@
                   >
                     {header}
                   </button>
+                {:else}
+                  <p class="text-muted mb-0">{NO_FIELDS_NOTE}</p>
                 {/each}
               </div>
-              <div class="form-text">Inserted into the field you last used ({lastFocusedInfo}).</div>
+              {#if headers.length > 0}
+                <div class="form-text">Inserted into the field you last used ({lastFocusedInfo}).</div>
+              {/if}
             </div>
 
             <div class="mb-0">
@@ -595,7 +848,8 @@
   </div>
 
   {#snippet footer()}
-    {#if importing}
+    <!-- Import only: a settings save is one small write, and reports itself with a toast. -->
+    {#if busy && !editing}
       <div class="w-100 mb-2">
         <div
           class="progress"
@@ -613,17 +867,14 @@
 
     <div class="wizard-navigation d-flex justify-content-between align-items-center w-100 pt-3">
       <div class="d-flex gap-2">
-        <button type="button" class="btn btn-secondary" disabled={importing} onclick={() => (open = false)}>
+        <button type="button" class="btn btn-secondary" disabled={busy} onclick={() => void requestClose()}>
           <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Cancel
         </button>
         {#if step < TOTAL_STEPS}
-          <button
-            type="button"
-            class="btn btn-outline-primary"
-            disabled={importing}
-            onclick={() => void runImport()}
-          >
-            <i class="bi bi-skip-forward me-1" aria-hidden="true"></i>Use Defaults
+          <!-- Commits what is on screen without walking the remaining steps. "Use Defaults" only
+               makes sense for a fresh import; editing commits the list's own configuration. -->
+          <button type="button" class="btn btn-outline-primary" disabled={busy} onclick={commit}>
+            <i class="bi bi-skip-forward me-1" aria-hidden="true"></i>{editing ? 'Save Now' : 'Use Defaults'}
           </button>
         {/if}
       </div>
@@ -647,13 +898,14 @@
             Next<i class="bi bi-arrow-right ms-1" aria-hidden="true"></i>
           </button>
         {:else}
-          <button type="button" class="btn btn-success" disabled={importing} onclick={() => void runImport()}>
-            {#if importing}
+          <button type="button" class="btn btn-success" disabled={busy} onclick={commit}>
+            {#if busy}
               <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
             {:else}
-              <i class="bi bi-download me-1" aria-hidden="true"></i>
+              <i class="bi me-1" class:bi-check-lg={editing} class:bi-download={!editing} aria-hidden="true"
+              ></i>
             {/if}
-            Import Data
+            {editing ? 'Save Changes' : 'Import Data'}
           </button>
         {/if}
       </div>

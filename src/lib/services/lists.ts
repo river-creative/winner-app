@@ -10,6 +10,7 @@
 
 import * as api from '$lib/api/client';
 import { data } from '$lib/state/data.svelte';
+import { settings } from '$lib/state/settings.svelte';
 import { setup } from '$lib/state/setup.svelte';
 import { toasts } from '$lib/state/toasts.svelte';
 import { ui } from '$lib/state/ui.svelte';
@@ -126,6 +127,21 @@ export function existingWinnerIds(winners: Winner[]): Set<string> {
   return ids;
 }
 
+/**
+ * Whether this list refuses anyone who has already won, at import and on every sync.
+ *
+ * The value lives on the list; the global setting is only the default a *new* list starts from,
+ * and the fallback here is what a list imported before that split gets. One function, one
+ * fallback, deliberately: the wizard shows the answer and the sync applies it, and two spellings
+ * of the same rule is how a checkbox comes to describe something the app does not do.
+ *
+ * `globalDefault` is a parameter rather than a store read so the rule stays pure and testable —
+ * the same shape as `buildEligibility(…, globalPreventSamePrize)`.
+ */
+export function skipsExistingWinners(list: List, globalDefault: boolean): boolean {
+  return list.metadata.listSettings?.skipExistingWinners ?? globalDefault;
+}
+
 /** The id for one imported row. Called exactly once per row — see the wizard's import step. */
 export function entryIdFor(row: Record<string, string>, idConfig: IdConfig): string {
   if (idConfig.source === 'column' && idConfig.column) {
@@ -150,6 +166,36 @@ export interface ImportSource {
   /** Present only for a Ministry Platform import — it is what makes the list syncable. */
   mpSource: MpSource | null;
 }
+
+/**
+ * An existing list, as the wizard's input.
+ *
+ * The gear on a list card opens the same wizard the import does, so the edit flow has to hand it
+ * the same shape. Its rows are the entries' data, which is what the field chips, the id column
+ * and every template preview are built from — so what the operator configures is previewed
+ * against the records the list actually holds.
+ */
+export function listAsImportSource(list: List): ImportSource {
+  const rows = list.entries.map((entry) => entry.data);
+
+  return {
+    rows,
+    // Sampled union, not `Object.keys(rows[0])`: a Ministry Platform record omits the fields it
+    // has no value for, so a sparse first entry would hide columns from the whole wizard.
+    headers: fieldNames(rows),
+    listName: list.metadata.name,
+    fileName: list.metadata.originalFilename ?? '',
+    mpSource: list.metadata.mpSource ?? null
+  };
+}
+
+/**
+ * What the wizard is configuring: a pending import, or a list that already exists.
+ *
+ * A union rather than an `ImportSource` plus an optional list, so there is no state in which a
+ * list is supplied and the wizard still behaves as an import, or the reverse.
+ */
+export type WizardTarget = { mode: 'import'; source: ImportSource } | { mode: 'edit'; list: List };
 
 export interface BuiltListInput {
   name: string;
@@ -214,6 +260,37 @@ export async function saveList(list: List): Promise<void> {
   data.upsertList(list);
 }
 
+/** What the wizard writes back when it is editing rather than importing. */
+export interface ListConfigInput {
+  name: string;
+  nameConfig: string;
+  infoConfig: InfoConfig;
+  listSettings: ListSettings;
+}
+
+/**
+ * Persist a settings edit onto an existing list.
+ *
+ * Metadata only, and only these four keys. **Entries are never touched** — they are already keyed
+ * by `idConfig` and every `winners.entryId` points at those keys, which is the same reason the
+ * wizard renders the record ID step read-only when editing. Spreading the list rather than
+ * rebuilding it is what makes that structural instead of remembered: `idConfig`, `mpSource`,
+ * `lastSyncAt`, `syncCount`, `entryCount`, `originalFilename` and `timestamp` cannot be lost by
+ * an edit here, because nothing in this function names them.
+ */
+export async function saveListConfig(list: List, config: ListConfigInput): Promise<void> {
+  await saveList({
+    ...list,
+    metadata: {
+      ...list.metadata,
+      name: config.name,
+      nameConfig: config.nameConfig,
+      infoConfig: config.infoConfig,
+      listSettings: { ...list.metadata.listSettings, ...config.listSettings }
+    }
+  });
+}
+
 /**
  * Archive: keep the metadata, discard the entries, drop the list.
  *
@@ -268,14 +345,53 @@ export interface SyncResult {
   added: number;
 }
 
+export interface SyncExclusions {
+  /** `removeWinnersFromList`: never re-add someone who won FROM THIS LIST. */
+  excludeWinnersOfThisList: boolean;
+  /** `skipExistingWinners`: never add someone who has won ANYWHERE. */
+  excludeAllWinners: boolean;
+}
+
+/**
+ * The ids a sync must not add back.
+ *
+ * Two rules sit next to each other here and stay separate because they answer different
+ * questions — one is about this list's own draws, the other about every draw there has ever
+ * been. Pure, because it is the whole of what `skipExistingWinners` changed about syncing and
+ * the rest of `syncListFromMp` is network and progress reporting.
+ */
+export function syncExclusionIds(
+  listId: string,
+  winners: Winner[],
+  { excludeWinnersOfThisList, excludeAllWinners }: SyncExclusions
+): Set<string> {
+  // `existingWinnerIds` also collects `winnerId`, which older records used as the record id —
+  // the same set the import filter uses, so the setting means one thing in both places.
+  const ids = excludeAllWinners ? existingWinnerIds(winners) : new Set<string>();
+
+  if (excludeWinnersOfThisList) {
+    for (const winner of winners) {
+      if (winner.listId === listId && winner.entryId) ids.add(winner.entryId);
+    }
+  }
+
+  return ids;
+}
+
 /**
  * Re-run the query this list came from and append whatever is new.
  *
- * Two rules carried over verbatim, because both are load-bearing:
+ * Three rules, all load-bearing:
  *  - the id column falls back to `idCard`, which is the column every MP query selected before
  *    `idConfig` existed;
  *  - a list that removes its winners also skips ids that have already won *from this list*,
- *    otherwise every sync hands back the people the draw just took out.
+ *    otherwise every sync hands back the people the draw just took out. The `!== false` default
+ *    is deliberate and not `removesWinners(list)`, which falls back to the global
+ *    `preventDuplicates`: a list that never removed its winners still holds them, so they are
+ *    already in `knownIds` and the difference is unobservable — while defaulting the other way
+ *    would re-add people a draw had taken out;
+ *  - a list with `skipExistingWinners` skips ids that have won *anywhere*, which is what makes
+ *    that a lasting list setting rather than a filter the import applied once.
  *
  * `lastSyncAt` and `syncCount` are bumped even when nothing was added — "synced, nothing new" and
  * "never synced" are different states, and the card shows the difference.
@@ -291,12 +407,10 @@ export async function syncListFromMp(list: List): Promise<SyncResult> {
     const idColumn = list.metadata.idConfig?.column ?? 'idCard';
     const knownIds = new Set(list.entries.map((entry) => entry.id));
 
-    const winnerIds = new Set<string>();
-    if (list.metadata.listSettings?.removeWinnersFromList !== false) {
-      for (const winner of data.winners) {
-        if (winner.listId === list.listId && winner.entryId) winnerIds.add(winner.entryId);
-      }
-    }
+    const winnerIds = syncExclusionIds(list.listId, data.winners, {
+      excludeWinnersOfThisList: list.metadata.listSettings?.removeWinnersFromList !== false,
+      excludeAllWinners: skipsExistingWinners(list, settings.current.skipExistingWinners)
+    });
 
     report(60, 'Finding new entries…');
     const newEntries: ListEntry[] = [];

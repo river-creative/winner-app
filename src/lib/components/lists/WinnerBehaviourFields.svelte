@@ -4,16 +4,9 @@
     idPrefix: string;
     removeWinners: boolean;
     preventSamePrize: boolean;
-    /** `info` in the edit dialog, `warning` in the import wizard — as the old markup had them. */
-    noticeVariant?: 'info' | 'warning';
   }
 
-  let {
-    idPrefix,
-    removeWinners = $bindable(),
-    preventSamePrize = $bindable(),
-    noticeVariant = 'warning'
-  }: Props = $props();
+  let { idPrefix, removeWinners = $bindable(), preventSamePrize = $bindable() }: Props = $props();
 
   /**
    * A list that keeps its winners must have *some* rule stopping the same person winning the
@@ -58,13 +51,8 @@
 </div>
 
 {#if !removeWinners}
-  <div class="alert alert-{noticeVariant} py-2 mb-0" role="status">
-    <i
-      class="bi me-1"
-      class:bi-info-circle={noticeVariant === 'info'}
-      class:bi-exclamation-triangle={noticeVariant === 'warning'}
-      aria-hidden="true"
-    ></i>
+  <div class="alert alert-warning py-2 mb-0" role="status">
+    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
     Winners will remain in list but cannot win the same prize twice.
   </div>
 {/if}

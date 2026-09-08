@@ -78,7 +78,7 @@ export interface IdConfig {
 }
 
 /**
- * Per-list overrides of the two global duplicate rules.
+ * Per-list overrides of the global duplicate rules.
  *
  * `preventWinningSamePrize` is forced true whenever `removeWinnersFromList` is false — a list
  * that keeps its winners has to have *some* rule stopping the same person winning the same
@@ -87,6 +87,15 @@ export interface IdConfig {
 export interface ListSettings {
   removeWinnersFromList: boolean;
   preventWinningSamePrize: boolean;
+  /**
+   * Do not add anyone who has already won *anywhere* — applied both at import and on every
+   * Ministry Platform sync.
+   *
+   * Optional because a list imported before this became per-list genuinely has no value of its
+   * own; `skipsExistingWinners()` is the one place that resolves the fallback to the global
+   * default, and nothing else should read this field directly.
+   */
+  skipExistingWinners?: boolean;
 }
 
 export interface ListMetadata {

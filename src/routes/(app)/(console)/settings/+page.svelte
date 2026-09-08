@@ -278,6 +278,17 @@
           label="Prevent winning same prize twice"
           tooltip="Winners cannot win the same prize multiple times"
         />
+        <!--
+          A default, not a rule: each list stores its own copy from the moment it is imported and
+          is edited through the gear on its card. It has to live here all the same — the import
+          wizard used to be the only thing that wrote it, so without this control the value a new
+          list starts from would be unreachable.
+        -->
+        <SettingCheck
+          setting="skipExistingWinners"
+          label="Skip existing winners by default"
+          tooltip="The starting value for new lists: records that have already won are not added. Each list can override this in its own settings."
+        />
         <SettingCheck
           setting="hideEntryCounts"
           label="Hide Entry Counts"

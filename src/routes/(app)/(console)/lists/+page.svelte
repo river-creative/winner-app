@@ -4,7 +4,6 @@
   import ImportWizard from '$lib/components/lists/ImportWizard.svelte';
   import ListCard from '$lib/components/lists/ListCard.svelte';
   import ListEntriesDialog from '$lib/components/lists/ListEntriesDialog.svelte';
-  import ListSettingsDialog from '$lib/components/lists/ListSettingsDialog.svelte';
   import MpImportDialog from '$lib/components/lists/MpImportDialog.svelte';
   import ReportImportDialog from '$lib/components/lists/ReportImportDialog.svelte';
   import { LIST_SORT_OPTIONS } from '$lib/constants/options';
@@ -30,7 +29,7 @@
   const sorted = $derived(sortLists(data.lists, sortField, sortDir));
   const hasLists = $derived(data.lists.length > 0);
 
-  /** Only ever one wizard, whichever of the three sources opened it. */
+  /** Only ever one import wizard, whichever of the three sources opened it. */
   let importSource = $state<ImportSource | null>(null);
   let reportDialogOpen = $state(false);
   let mpDialogOpen = $state(false);
@@ -388,9 +387,14 @@
   {/key}
 {/if}
 
+<!--
+  The gear opens the same five-step wizard an import does, pre-filled from the list — one place
+  where a list's name, its templates and its winner rules are configured, whether it is being
+  created or changed. The record ID step renders read-only there; see ImportWizard.
+-->
 {#if editList}
   {#key editList.listId}
-    <ListSettingsDialog list={editList} onclose={() => (editListId = null)} />
+    <ImportWizard target={{ mode: 'edit', list: editList }} onclose={() => (editListId = null)} />
   {/key}
 {/if}
 
@@ -407,6 +411,6 @@
 
 {#if importSource}
   {#key importSource}
-    <ImportWizard source={importSource} onclose={() => (importSource = null)} />
+    <ImportWizard target={{ mode: 'import', source: importSource }} onclose={() => (importSource = null)} />
   {/key}
 {/if}
