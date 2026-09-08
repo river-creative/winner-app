@@ -89,6 +89,29 @@ export default defineConfig({
           include: ['src/**/*.svelte.test.ts'],
           setupFiles: ['./vitest-setup.ts']
         }
+      },
+      {
+        extends: true,
+        // The Express side. It is compiled by tsconfig.backend.json rather than by SvelteKit, so
+        // `$lib` does not resolve here and these files import each other by relative path.
+        //
+        // Anything added under backend/ must also be excluded from tsconfig.backend.json, whose
+        // outDir is backend/ itself — otherwise `npm run build:backend` emits the tests next to
+        // the server and deploys them.
+        resolve: {
+          // Backend modules import each other as `./thing.js`, the ESM specifier TypeScript emits.
+          // `outDir` is `backend/` itself, so after any `npm run build:backend` those `.js` files
+          // exist on disk right next to their sources — and vitest resolves the specifier
+          // literally, silently testing the last build instead of the code. That is not
+          // hypothetical: this project's first backend test passed against stale output and only
+          // failed once the source gained a check the build did not have.
+          alias: [{ find: /^(\.{1,2}\/.*)\.js$/, replacement: '$1.ts' }]
+        },
+        test: {
+          name: 'backend',
+          environment: 'node',
+          include: ['backend/**/*.test.ts']
+        }
       }
     ]
   }

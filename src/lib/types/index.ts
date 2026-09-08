@@ -451,12 +451,49 @@ export interface BatchRequest {
   id?: string;
 }
 
-export interface BatchSaveOperation {
+/** Replace the stored document under this key, creating it if it is not there yet. */
+export interface BatchSaveUpsert {
   collection: Collection;
-  operation?: 'delete';
+  operation?: undefined;
+  id?: string;
+  data: Record<string, unknown>;
+}
+
+export interface BatchSaveDelete {
+  collection: Collection;
+  operation: 'delete';
   id?: string;
   data?: Record<string, unknown>;
 }
+
+/**
+ * Drop a handful of entries from one list without posting the list back.
+ *
+ * The draw used to rebuild its source lists client-side and send them whole — 7.4 MB to remove
+ * five entries from a twenty-thousand-entry list, with the reveal held behind that upload.
+ */
+export interface BatchSaveRemoveEntries {
+  collection: 'lists';
+  operation: 'removeEntries';
+  id: string;
+  entryIds: string[];
+}
+
+/** The inverse, for undo. Entries are appended, matching what the client-side rebuild did. */
+export interface BatchSaveRestoreEntries {
+  collection: 'lists';
+  operation: 'restoreEntries';
+  id: string;
+  entries: ListEntry[];
+}
+
+/**
+ * A union rather than one interface with four optional fields, so `removeEntries` without
+ * `entryIds` cannot be constructed. The upsert and delete members are unchanged, so every
+ * operation built elsewhere in the app still satisfies this without an edit.
+ */
+export type BatchSaveOperation =
+  BatchSaveUpsert | BatchSaveDelete | BatchSaveRemoveEntries | BatchSaveRestoreEntries;
 
 // ---------------------------------------------------------------------------------------------
 // Texting

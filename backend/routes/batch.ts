@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { DATA_DIR, isValidCollection, getKeyField, CollectionItem } from '../config.js';
 import { readCollection, writeCollection } from '../services/collection.js';
+import { removeEntries, restoreEntries } from '../services/list-entries.js';
 
 export const batchRouter = express.Router();
 
@@ -59,13 +60,43 @@ batchRouter.post('/batch-save', async (req: Request, res: Response) => {
     const results: any[] = [];
 
     for (const op of operations) {
-      const { collection, data, operation, id } = op;
+      const { collection, data, operation, id, entryIds, entries } = op;
 
       if (!isValidCollection(collection)) {
         return res.status(400).json({ error: `Invalid collection: ${collection}` });
       }
 
       const keyField = getKeyField(collection);
+
+      // Entry-level edits to one list, so a draw does not have to post the whole list back to
+      // remove the handful of rows it just drew. See services/list-entries.ts for why these
+      // refuse rather than skip: the caller has already written its winners by this point.
+      if (operation === 'removeEntries' || operation === 'restoreEntries') {
+        if (collection !== 'lists') {
+          return res.status(400).json({
+            error: `${operation} applies to the lists collection, not ${collection}.`
+          });
+        }
+        if (!id) {
+          return res.status(400).json({ error: `${operation} needs the list id.` });
+        }
+
+        if (!changes[collection]) {
+          changes[collection] = await readCollection(collection);
+        }
+
+        try {
+          const entryCount =
+            operation === 'removeEntries'
+              ? removeEntries(changes[collection], id, entryIds)
+              : restoreEntries(changes[collection], id, entries);
+
+          results.push({ success: true, id, collection, entryCount });
+        } catch (error: any) {
+          return res.status(400).json({ error: error.message });
+        }
+        continue;
+      }
 
       if (operation === 'delete') {
         if (!changes[collection]) {

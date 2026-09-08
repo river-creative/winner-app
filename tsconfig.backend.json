@@ -25,7 +25,10 @@
   "exclude": [
     "node_modules",
     "dist",
-    "src"
+    "src",
+    // outDir is backend/ itself, so anything compiled here lands next to the server and ships
+    // with it. Tests are run by vitest from the .ts directly and must never be emitted.
+    "backend/**/*.test.ts"
   ],
   "ts-node": {
     "esm": true,
