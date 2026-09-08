@@ -2892,6 +2892,28 @@ body {
 }
 
 /* ==========================================================================
+   Fieldset legends
+   --------------------------------------------------------------------------
+   A group of radios needs a <fieldset> and a <legend> to be announced as one
+   labelled group, and the legend is written as `.form-label` so it reads as
+   the label it is. Bootstrap does not make that work on its own: it sizes
+   every `legend` at `calc(1.275rem + .3vw)`, while `.form-label` sets nothing
+   but a margin — so the group's label rendered half again as large as the
+   field labels beside it.
+
+   `inherit`, not a fixed size: that is exactly what a `<label class="form-label">`
+   renders at, since labels never change the font size they are given.
+
+   The Setup screen's "Select Lists" legend papered over this locally by adding
+   `.h6`; it keeps that class deliberately — there the legend IS a heading —
+   and the two agree on size, so nothing about it moves.
+   ========================================================================== */
+
+legend.form-label {
+  font-size: inherit;
+}
+
+/* ==========================================================================
    Native dialogs
    --------------------------------------------------------------------------
    Modals are <dialog> elements now, not Bootstrap's JS modal. The element
