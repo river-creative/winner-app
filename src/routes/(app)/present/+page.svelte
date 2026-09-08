@@ -21,6 +21,14 @@
 
   const revealed = $derived(winners.slice(0, draw.revealedCount));
 
+  /**
+   * The card that just landed, for the announcement below.
+   *
+   * A staggered reveal adds one at a time, so naming only the newest is what a listener needs;
+   * re-reading the whole growing list on every card would talk over the room.
+   */
+  const lastRevealed = $derived(revealed[revealed.length - 1]);
+
   const mode = $derived(settings.current.selectionMode);
   const individual = $derived(mode === 'individual');
 
@@ -145,6 +153,24 @@
   <!-- The one heading for the screen. The visible "Winner Selection" title below is an <h2>
        because it disappears the moment the winners are on stage. -->
   <h1 class="visually-hidden">Winner selection</h1>
+
+  <!--
+    The draw announces that it started — DelayOverlay's countdown is a `role="status"` — and then
+    replaced itself with a `role="list"` of winners, which announces nothing. A screen-reader user
+    was told the draw had begun and never told it had finished.
+
+    Polite rather than assertive: it must not cut across the operator's own screen reader mid-
+    sentence, and it is confirming something they asked for, not warning them.
+  -->
+  <p class="visually-hidden" role="status" aria-live="polite">
+    {#if draw.phase === 'revealed' && result}
+      All {winners.length}
+      {pluralise(winners.length, 'winner')} drawn for {result.prize.name}:
+      {winners.map((winner) => winner.displayName).join(', ')}
+    {:else if draw.phase === 'revealing' && lastRevealed}
+      Winner {lastRevealed.position}: {lastRevealed.displayName}
+    {/if}
+  </p>
 
   <!-- The stage carries the themed background; the backdrop around it stays dark, which is what
        makes the letterbox bars read as bars. The letterboxing itself is pure CSS, keyed off the
