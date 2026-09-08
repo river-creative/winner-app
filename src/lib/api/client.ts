@@ -35,11 +35,21 @@ export class ApiError extends Error {
   readonly status: number;
   readonly body: unknown;
 
-  constructor(message: string, status: number, body: unknown) {
+  /**
+   * The request was cut off by its own deadline, not refused.
+   *
+   * The distinction matters for writes and nothing else: a refused write did not happen, while a
+   * write that timed out may well have been applied. A caller that reports "nothing was saved"
+   * for both is lying half the time.
+   */
+  readonly timedOut: boolean;
+
+  constructor(message: string, status: number, body: unknown, timedOut = false) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
+    this.timedOut = timedOut;
   }
 
   /** The session cookie is gone or expired. The caller must not treat this as "no data". */
@@ -89,6 +99,8 @@ const SILENT_401_PATHS = new Set(['/auth/session']);
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
+  let body: unknown;
+
   try {
     response = await fetch(`${API_BASE}${path}`, {
       ...init,
@@ -97,7 +109,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         ...init?.headers
       }
     });
+
+    // Reading the body sits inside the same `try` as the fetch deliberately.
+    //
+    // A deadline can fire at either point, and which one it lands on depends on timing the
+    // caller has no control over: abort the request and `fetch` rejects; abort while the
+    // response body is still streaming and it is *this* line that rejects. With only the fetch
+    // guarded, the second case escaped as a raw DOMException and reached the operator as
+    // "The draw failed. The user aborted a request." — the plainly wrong message, on a draw the
+    // server had in fact saved in full. Measured, not theorised.
+    body = await readBody(response);
   } catch (cause) {
+    // `AbortSignal.timeout()` sets the signal's reason to a DOMException named `TimeoutError`,
+    // which is what `fetch` rejects with — but a body read cancelled by that same signal rejects
+    // with a plain `AbortError`. Both mean the deadline, so both are classified as one.
+    const name = cause instanceof Error ? cause.name : '';
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      throw new ApiError(
+        'The server did not answer in time.',
+        0,
+        cause instanceof Error ? cause.message : String(cause),
+        true
+      );
+    }
+
     throw new ApiError(
       'Cannot reach the server. Please check your connection.',
       0,
@@ -105,7 +140,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
 
-  const body = await readBody(response);
   if (!response.ok) {
     if (response.status === 401 && !SILENT_401_PATHS.has(path)) sessionExpiredHandler?.();
     throw new ApiError(messageFrom(body, response.status), response.status, body);
@@ -199,7 +233,20 @@ export async function batchFetch(requests: BatchRequest[]): Promise<Record<strin
 }
 
 export interface BatchSaveResult {
-  results: Array<{ success: boolean; id: string; collection: Collection }>;
+  results: Array<{
+    success: boolean;
+    id: string;
+    collection: Collection;
+    /**
+     * The list's entry count after an entry-level operation.
+     *
+     * Returned rather than recomputed on both sides: the client also updates its own copy so the
+     * screen does not wait for a reload, and two independent subtractions silently disagree the
+     * moment the server's copy of the list differs from this page's — which is exactly the
+     * concurrent-edit case entry-level operations exist to survive.
+     */
+    entryCount?: number;
+  }>;
   writeResults: Partial<Record<Collection, boolean>>;
 }
 
@@ -209,8 +256,15 @@ export interface BatchSaveResult {
  * The store has no locking: two separate POSTs to `winners` both read the old array and both
  * write it back whole, so the second silently drops the first. One batched call reads once.
  */
-export async function batchSave(operations: BatchSaveOperation[]): Promise<BatchSaveResult> {
-  return request<BatchSaveResult>('/batch-save', json({ operations }));
+export async function batchSave(
+  operations: BatchSaveOperation[],
+  timeoutMs?: number
+): Promise<BatchSaveResult> {
+  const init = json({ operations });
+  return request<BatchSaveResult>(
+    '/batch-save',
+    timeoutMs ? { ...init, signal: AbortSignal.timeout(timeoutMs) } : init
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

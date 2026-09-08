@@ -228,9 +228,9 @@ class DataStore {
    * `data/<collection>.json` has no locking: each write reads the whole array and writes it
    * back, so two concurrent writes to one collection lose one of them. Batching means one read.
    */
-  async commit(operations: BatchSaveOperation[]): Promise<void> {
-    if (operations.length === 0) return;
-    await api.batchSave(operations);
+  async commit(operations: BatchSaveOperation[], timeoutMs?: number): Promise<api.BatchSaveResult> {
+    if (operations.length === 0) return { results: [], writeResults: {} };
+    return api.batchSave(operations, timeoutMs);
   }
 
   /** Report a failed write consistently, so no screen has to invent its own wording. */

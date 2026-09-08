@@ -21,11 +21,8 @@
 
   let canvas = $state<HTMLCanvasElement>();
 
-  /** Set once the configured delay has run out, cleared when the draw leaves the delay phase. */
-  let delayElapsed = $state(false);
-
   const previewVisual = $derived(preview.delayVisual);
-  const drawing = $derived(draw.phase === 'delaying');
+  const drawing = $derived(draw.phase === 'delaying' || draw.phase === 'selecting');
 
   const visual = $derived(previewVisual ?? (drawing ? settings.current.delayVisualType : null));
   const remaining = $derived(previewVisual ? preview.remaining : draw.delayRemaining);
@@ -44,12 +41,22 @@
 
   /**
    * The draw and the delay run concurrently, so the countdown can hit zero while the winners are
-   * still being written. Without this the room stares at a frozen "1" — or, when no delay is
-   * configured at all, at nothing — for the length of the write.
+   * still being written. The room must not be left staring at a frozen "1" for the length of the
+   * write — but it must not be shown a spinner either, unless something really is still running.
+   *
+   * That distinction is the store's to make, not this component's. It used to be inferred here
+   * from `phase === 'delaying'` plus a locally tracked "the delay is over" flag, which is true
+   * both a microtask before the reveal and five seconds into a slow write — so the spinner
+   * appeared on every draw, measured at 1.8 s *after* the winners had been saved. `'selecting'`
+   * means exactly one thing: the countdown is over and the write has not come back.
    */
-  const waiting = $derived(
-    previewVisual === null && drawing && (settings.current.preSelectionDelay <= 0 || delayElapsed)
-  );
+  const waiting = $derived(previewVisual === null && draw.phase === 'selecting');
+
+  /**
+   * The countdown has run out, and nothing has replaced it yet — the 600 ms beat the end-of-delay
+   * sting plays into. The stage stays empty for it on purpose.
+   */
+  const countdownFinished = $derived(previewVisual === null && draw.delayProgress >= 1);
 
   type Pane = 'hidden' | 'spinner' | 'countdown';
 
@@ -62,15 +69,9 @@
    * "Finalizing selection…" with nothing to say why. Turning the show down is what the setting
    * itself is for — "No Visual (Silent)" is one of the six choices.
    */
-  const pane = $derived<Pane>(!visual || visual === 'none' ? 'hidden' : waiting ? 'spinner' : 'countdown');
-
-  $effect(() => {
-    if (draw.phase !== 'delaying') {
-      delayElapsed = false;
-      return;
-    }
-    if (draw.delayProgress >= 1) delayElapsed = true;
-  });
+  const pane = $derived<Pane>(
+    !visual || visual === 'none' ? 'hidden' : waiting ? 'spinner' : countdownFinished ? 'hidden' : 'countdown'
+  );
 
   // A beep on each decrement, matching the old countdown. `lastTick` is a plain `let` because
   // nothing renders from it.

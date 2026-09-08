@@ -8,6 +8,7 @@ import type {
   Prize,
   Winner
 } from '$lib/types';
+import { ApiError, type BatchSaveResult } from '$lib/api/client';
 import type { Candidate } from '$lib/services/eligibility';
 import { playSound, stopSound, type SoundOption } from '$lib/services/sounds';
 import { formatDisplayName } from '$lib/utils/format';
@@ -29,6 +30,18 @@ export interface DrawResult {
 /** A shuffle of 20 000 entries takes milliseconds; anything near this is a wedged worker. */
 const SELECTION_TIMEOUT_MS = 30_000;
 
+/**
+ * How long the draw will wait for its write before giving up on it.
+ *
+ * The reveal is held behind this request, so an unbounded wait is a show that never resumes —
+ * with a spinner on the projector and no way out but a reload. Generous, because the operator
+ * would rather wait than lose the draw, but finite, because "forever" is not a state a live event
+ * can be in. Now that the batch carries entry ids instead of whole lists it is a few hundred
+ * bytes plus the winner records, so reaching this at all means the server or the link is in
+ * trouble, not that the payload is large.
+ */
+const COMMIT_TIMEOUT_MS = 20_000;
+
 /** How often the pre-selection delay updates its countdown. Smooth enough, and it always fires. */
 const DELAY_TICK_MS = 50;
 
@@ -48,6 +61,15 @@ class DrawStore {
 
   #lastAction = $state<LastAction | null>(null);
   #sounds: SoundOption[] = [];
+
+  /**
+   * Identifies the current run, so work left over from an abandoned one cannot touch the new one.
+   *
+   * The delay is a timer that always runs to completion — a draw that fails after 100 ms leaves a
+   * 3-second countdown still ticking behind it. Without this token that stale timer resolves into
+   * whatever draw happens to be running by then and moves its phase.
+   */
+  #runToken = 0;
 
   get phase(): DrawPhase {
     return this.#phase;
@@ -129,12 +151,31 @@ class DrawStore {
       return;
     }
 
+    const token = ++this.#runToken;
+
     try {
       // The delay and the draw run together: the winners are picked and written while the
       // countdown is on screen, so the reveal is instant when the countdown ends.
+      this.#delayProgress = 0;
+      this.#delayRemaining = 0;
       this.#phase = 'delaying';
-      const selectionPromise = this.#selectAndCommit(candidates, prize, count);
-      const delayPromise = this.#runDelay();
+
+      // `settled` is the fact the public view had no way to see. `phase === 'delaying'` is
+      // equally true a microtask before the reveal and five seconds into a slow write, so the
+      // overlay showed "Preparing winners…" on every single draw — including the ones whose
+      // winners had been saved two seconds earlier. Now the spinner has something real to key on.
+      let settled = false;
+      const selectionPromise = this.#selectAndCommit(candidates, prize, count).finally(() => {
+        settled = true;
+      });
+
+      const delayPromise = this.#runDelay(token).then(() => {
+        // Only now is there anything to wait for. Guarded twice: a draw that already failed has
+        // set 'idle', and an abandoned run's timer must never speak for the run that replaced it.
+        if (!settled && this.#runToken === token && this.#phase === 'delaying') {
+          this.#phase = 'selecting';
+        }
+      });
 
       const [result] = await Promise.all([selectionPromise, delayPromise]);
 
@@ -145,8 +186,44 @@ class DrawStore {
     } catch (error) {
       // Without this the phase sticks on 'selecting' and the public view spins forever.
       this.#phase = 'idle';
+
+      // A write that ran out of time is not a write that did not happen — the server may have
+      // applied it after this page stopped waiting. "Nothing was saved" would be a guess, and
+      // acting on it by drawing again is how the same prize goes out twice. Re-read instead, so
+      // the Winners tab shows whatever actually landed.
+      if (error instanceof ApiError && error.timedOut) {
+        // Awaited, like undo's: there is no reveal left to unblock — this path already gave up on
+        // the draw — and the operator is about to be told to go and look at the Winners tab.
+        await this.#resync();
+        this.#error =
+          'The server did not answer in time. The winners may or may not have been saved — ' +
+          'check the Winners tab before drawing again.';
+        toasts.error(this.#error);
+        return;
+      }
+
       this.#error = error instanceof Error ? error.message : 'The draw failed.';
       toasts.fromError(error, 'The draw failed. Nothing was saved.');
+    }
+  }
+
+  /**
+   * Re-read what the draw writes, after a write whose outcome is unknown.
+   *
+   * Collection by collection rather than `loadAll()`, which raises the global loading flag and
+   * blanks the console mid-incident. Failures are swallowed on purpose: the operator has already
+   * been told to check, and a failed refresh must not throw a second error on top of the first.
+   */
+  async #resync(): Promise<void> {
+    try {
+      await Promise.all([
+        data.reload('winners'),
+        data.reload('history'),
+        data.reload('prizes'),
+        data.reload('lists')
+      ]);
+    } catch {
+      /* nothing useful to add — the message already tells them to check for themselves */
     }
   }
 
@@ -248,25 +325,36 @@ class DrawStore {
         else kept.push(entry);
       }
 
-      const updated: List = {
+      updatedLists.push({
         ...list,
         entries: kept,
         metadata: { ...list.metadata, entryCount: kept.length }
-      };
-      updatedLists.push(updated);
+      });
+
+      // Ids, not the list. Rebuilding the list here and posting it whole cost 7.4 MB to remove
+      // five entries from a twenty-thousand-entry list — and the room watched a spinner for the
+      // whole upload, because the reveal waits on this write.
       operations.push({
         collection: 'lists',
-        data: updated as unknown as Record<string, unknown>
+        operation: 'removeEntries',
+        id: list.listId,
+        entryIds: [...drawnIds]
       });
     }
 
-    await data.commit(operations);
+    const commit = await data.commit(operations, COMMIT_TIMEOUT_MS);
 
     // Only touch local state once the write succeeded, so a failure leaves nothing half-applied.
     data.addWinners(winners);
     data.upsertPrize(updatedPrize);
     data.upsertHistory(historyEntry);
     for (const list of updatedLists) data.upsertList(list);
+
+    // The server counts the entries it actually holds. A disagreement means this page's copy of
+    // a list had already drifted from the stored one — someone else imported or edited it — so
+    // the local copy is refreshed, once the winners are on their way to the screen rather than
+    // before. Local state stays self-consistent either way: `kept` is what `entries` holds.
+    if (listCountsDrifted(commit.results, updatedLists)) void data.reload('lists');
 
     this.#lastAction = {
       type: 'selectWinners',
@@ -292,9 +380,15 @@ class DrawStore {
   // Delay and reveal
   // -------------------------------------------------------------------------------------------
 
-  async #runDelay(): Promise<void> {
+  async #runDelay(token: number): Promise<void> {
     const seconds = settings.current.preSelectionDelay;
-    if (!seconds || seconds <= 0) return;
+    if (!seconds || seconds <= 0) {
+      // "How far through the countdown are we" is 1 when there is no countdown: complete. The
+      // overlay reads this to decide whether to render a number, and 0 would make it flash a
+      // phantom "1" for a frame on a draw configured to have no delay at all.
+      this.#delayProgress = 1;
+      return;
+    }
 
     const duringSound = settings.current.soundDuringDelay;
     if (duringSound && duringSound !== 'none') void playSound(duringSound, this.#sounds);
@@ -328,17 +422,24 @@ class DrawStore {
 
     stopSound();
 
+    // A draw that failed while the countdown was still running has already told the operator so.
+    // Playing its punchline three seconds later, over an error message, is worse than silence.
+    if (this.#runToken !== token) return;
+
     const endSound = settings.current.soundEndOfDelay;
     if (endSound && endSound !== 'none') {
       // The sting needs a beat of silence in front of it and a beat to land in behind it,
-      // otherwise the reveal steps on its own drum roll.
+      // otherwise the reveal steps on its own drum roll. The stage is deliberately empty for
+      // those 600 ms: nothing is loading, so nothing may claim to be.
       await sleep(100);
       void playSound(endSound, this.#sounds);
       await sleep(500);
     }
 
-    this.#delayProgress = 0;
-    this.#delayRemaining = 0;
+    // `#delayProgress` is deliberately NOT reset here. It is reset when a run starts, so that
+    // "the countdown has finished" stays true for as long as the run lasts. Zeroing it at the end
+    // of the delay made it briefly indistinguishable from "the countdown has not started", and
+    // the overlay answered that by re-rendering the final number for a frame.
   }
 
   /**
@@ -394,10 +495,14 @@ class DrawStore {
   /** Back to the setup screen, keeping the last action so undo is still available. */
   reset(): void {
     stopSound();
+    // Abandons any timer still running for the previous draw, so it cannot move this store again.
+    this.#runToken += 1;
     this.#phase = 'idle';
     this.#result = null;
     this.#revealedCount = 0;
     this.#error = null;
+    this.#delayProgress = 0;
+    this.#delayRemaining = 0;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -455,22 +560,35 @@ class DrawStore {
       for (const [listId, entries] of entriesByList) {
         const list = data.listById(listId);
         if (!list) continue;
-        const restored: List = {
+        restoredLists.push({
           ...list,
           entries: [...list.entries, ...entries],
           metadata: { ...list.metadata, entryCount: list.entries.length + entries.length }
-        };
-        restoredLists.push(restored);
-        operations.push({
-          collection: 'lists',
-          data: restored as unknown as Record<string, unknown>
         });
+        // Only the entries coming back, for the same reason the draw sends only ids: undo has no
+        // business re-uploading every row of a list to put a handful of them back.
+        operations.push({ collection: 'lists', operation: 'restoreEntries', id: listId, entries });
       }
     }
 
+    let commit: BatchSaveResult;
     try {
-      await data.commit(operations);
+      // Bounded for the same reason the draw's write is: an undo that never returns leaves the
+      // operator with a button that appears to do nothing, and pressing it again is the one thing
+      // they must not do while the first attempt may still be in flight.
+      commit = await data.commit(operations, COMMIT_TIMEOUT_MS);
     } catch (error) {
+      // "Nothing was changed" is true of a refused write and a guess about one that ran out of
+      // time — the server may have deleted the winners after this page stopped listening.
+      if (error instanceof ApiError && error.timedOut) {
+        await this.#resync();
+        toasts.error(
+          'The server did not answer in time. The draw may or may not have been undone — ' +
+            'check the Winners tab before trying again.'
+        );
+        return false;
+      }
+
       toasts.fromError(error, 'Could not undo the draw. Nothing was changed.');
       return false;
     }
@@ -479,6 +597,8 @@ class DrawStore {
     data.removeHistory(action.historyId);
     if (restoredPrize) data.upsertPrize(restoredPrize);
     for (const list of restoredLists) data.upsertList(list);
+
+    if (listCountsDrifted(commit.results, restoredLists)) void data.reload('lists');
 
     this.#lastAction = null;
     this.reset();
@@ -527,6 +647,27 @@ class DrawStore {
       }
     }
   }
+}
+
+/**
+ * Has this page's copy of a list fallen behind the stored one?
+ *
+ * Entry-level operations let the server count the entries it actually holds and report it back.
+ * When that number differs from the count this page arrived at, the two copies of the list had
+ * already diverged before the draw — someone else imported into it, or edited it — and only a
+ * reload can settle it. Cheap to check, and it turns a silent disagreement into a refresh.
+ */
+function listCountsDrifted(results: BatchSaveResult['results'], expected: List[]): boolean {
+  if (expected.length === 0) return false;
+
+  const counts = new Map(expected.map((list) => [list.listId, list.entries.length]));
+  return results.some(
+    (entry) =>
+      entry.collection === 'lists' &&
+      typeof entry.entryCount === 'number' &&
+      counts.has(entry.id) &&
+      counts.get(entry.id) !== entry.entryCount
+  );
 }
 
 /**
