@@ -36,10 +36,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function prefersReducedMotion(): boolean {
-  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
 class DrawStore {
   #phase = $state<DrawPhase>('idle');
   #result = $state<DrawResult | null>(null);
@@ -364,7 +360,10 @@ class DrawStore {
       return;
     }
 
-    if (mode === 'all-at-once' || prefersReducedMotion()) {
+    // Selection Mode alone decides this. `prefersReducedMotion()` was ORed in here, which turned
+    // a Sequential Reveal into an all-at-once dump whenever the projector's machine had the OS
+    // flag set — the operator's explicit choice, discarded without a word.
+    if (mode === 'all-at-once') {
       this.#revealedCount = result.winners.length;
       this.#phase = 'revealed';
       return;

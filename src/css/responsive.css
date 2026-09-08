@@ -1350,6 +1350,19 @@
 
 /* ----------------------------------------------------------------------------
    11. MOTION
+   --------------------------------------------------------------------------
+   Scope: the operator's own console, and nothing that is projected.
+
+   `prefers-reduced-motion` is a preference its owner sets on their own device
+   about their own interface. The public display is neither: it is a show an
+   operator configures per event, on a machine the audience never touches, and
+   the audience never set that flag. Honouring it there took the delay visual,
+   the celebration and the reveal effect away from an operator who had picked
+   them by name — silently, with no way to tell why.
+
+   The presentation is turned down through its own settings instead, which are
+   explicit and per-event: Delay Visual "No Visual (Silent)", Celebration
+   Effect "No Animation", Selection Mode "All at Once".
    ---------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1368,26 +1381,6 @@
   .list-card-view,
   .list-card-sync {
     transition: none !important;
-  }
-
-  /* A winner card starts at `opacity: 0` and is brought in by whichever display-effect
-     animation the operator chose. Dropping the animation on its own would therefore leave the
-     grid empty rather than still — the cards go straight to their final state instead.
-
-     The placeholder rule is restated because the stable grid puts `.winner-card` on those too,
-     and this layer loads after styles.css, so the rule above would otherwise reveal them. */
-  .winner-card.fade-in,
-  .winner-card.fly-in,
-  .winner-card.zoom-in,
-  .winner-card.slide-in,
-  .winner-card.bounce-in {
-    animation: none;
-    opacity: 1;
-  }
-
-  .winner-card.winner-card-placeholder {
-    visibility: hidden;
-    opacity: 0;
   }
 }
 

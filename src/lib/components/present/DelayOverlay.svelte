@@ -4,7 +4,6 @@
   import { draw } from '$lib/state/draw.svelte';
   import { preview } from '$lib/state/preview.svelte';
   import { settings } from '$lib/state/settings.svelte';
-  import { reducedMotion } from '$lib/utils/motion.svelte';
 
   /**
    * Every pre-selection delay visual, in one component.
@@ -18,7 +17,6 @@
    * rendered here. `.delay-countdown` (the spinning circle), `.delay-progress` and `.delay-dots`
    * were selected by `displayType` values — `spinner`, `progress`, `dots` — that no longer exist
    * in the `DelayVisualType` union, so wiring them up would add markup no setting can reach.
-   * `.delay-progress` earns its place back as the reduced-motion substitute, below.
    */
 
   let canvas = $state<HTMLCanvasElement>();
@@ -30,12 +28,10 @@
   const drawing = $derived(draw.phase === 'delaying');
 
   const visual = $derived(previewVisual ?? (drawing ? settings.current.delayVisualType : null));
-  const progress = $derived(previewVisual ? preview.progress : draw.delayProgress);
   const remaining = $derived(previewVisual ? preview.remaining : draw.delayRemaining);
 
   /** Never shows 0: the old countdown hid itself on reaching zero rather than displaying it. */
   const tick = $derived(Math.max(1, Math.ceil(remaining)));
-  const percent = $derived(Math.round(Math.min(1, Math.max(0, progress)) * 100));
 
   const canvasType = $derived<DelayAnimationType | null>(
     visual === 'animation' ||
@@ -55,17 +51,18 @@
     previewVisual === null && drawing && (settings.current.preSelectionDelay <= 0 || delayElapsed)
   );
 
-  type Pane = 'hidden' | 'progress' | 'spinner' | 'countdown';
+  type Pane = 'hidden' | 'spinner' | 'countdown';
 
-  const pane = $derived<Pane>(
-    !visual || visual === 'none'
-      ? 'hidden'
-      : reducedMotion.matches
-        ? 'progress'
-        : waiting
-          ? 'spinner'
-          : 'countdown'
-  );
+  /**
+   * The operator's choice decides this, and nothing else.
+   *
+   * `prefers-reduced-motion` used to sit ahead of `visual` here and substitute a progress bar.
+   * That flag belongs to whoever set it on the machine driving the projector; the room watching
+   * never expressed it, and an operator who had picked "Time Machine" by name got a bar reading
+   * "Finalizing selection…" with nothing to say why. Turning the show down is what the setting
+   * itself is for — "No Visual (Silent)" is one of the six choices.
+   */
+  const pane = $derived<Pane>(!visual || visual === 'none' ? 'hidden' : waiting ? 'spinner' : 'countdown');
 
   $effect(() => {
     if (draw.phase !== 'delaying') {
@@ -101,22 +98,7 @@
   });
 </script>
 
-{#if pane === 'progress'}
-  <!--
-    Reduced motion: no pulsing number, no particle canvas. A bar that fills is information about
-    how long the wait has left, which is the one thing the viewer actually needs from this screen.
-  -->
-  <div class="delay-overlay" role="status">
-    <div class="delay-content">
-      <div class="delay-progress">
-        <div class="progress-container" aria-hidden="true">
-          <div class="progress-bar-delay" style:width="{percent}%"></div>
-        </div>
-        <div class="mt-3 text-light">Finalizing selection…</div>
-      </div>
-    </div>
-  </div>
-{:else if pane === 'spinner'}
+{#if pane === 'spinner'}
   <div class="delay-overlay" role="status">
     <div class="delay-content">
       <div class="delay-spinner">

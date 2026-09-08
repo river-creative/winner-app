@@ -4,7 +4,6 @@
   import { draw } from '$lib/state/draw.svelte';
   import { preview } from '$lib/state/preview.svelte';
   import { settings } from '$lib/state/settings.svelte';
-  import { reducedMotion } from '$lib/utils/motion.svelte';
 
   let canvas = $state<HTMLCanvasElement>();
 
@@ -75,7 +74,7 @@
     const previous = lastRevealedCount;
     lastRevealedCount = revealed;
 
-    if (!enabled || reducedMotion.matches || revealed <= previous) return;
+    if (!enabled || revealed <= previous) return;
 
     untrack(() => {
       // Queried once, not once per card: an `all-at-once` reveal of a hundred winners arrives as
@@ -88,9 +87,10 @@
   });
 
   function celebrate(fromPreview: boolean): void {
-    // No motion means no motion: not a shorter celebration, none at all.
-    if (reducedMotion.matches) return;
-
+    // Whether a celebration plays is `celebrationEffect` ("No Animation" turns it off) and
+    // `celebrationAutoTrigger`, both set per event. `prefers-reduced-motion` used to veto it
+    // regardless: a flag on the machine driving the projector, silently overruling the show the
+    // operator configured for a room that never set it.
     const target = animator;
     if (!target) return;
 
