@@ -47,6 +47,12 @@ export default defineConfig({
 
   server: {
     port: 3000,
+    // Fail rather than drift. Without this Vite silently takes the next free port when 3000 is
+    // busy, and the app then loads from an origin the backend's CORS allowlist does not name —
+    // which fails every ES-module chunk and renders a blank screen or "Could not load data",
+    // with a 500 on an asset as the only clue. A refused start is a far cheaper way to be told
+    // that something is already on the port.
+    strictPort: true,
     // Same-origin in dev, so the session cookie is sent without CORS or `credentials: 'include'`
     // — matching production, where Express serves the bundle itself.
     proxy: {
