@@ -3,7 +3,7 @@ import { availablePlaceholders, DEFAULT_TEMPLATE_ID, defaultTemplateSeed, writes
 import type { List, ListEntry, Template } from '$lib/types';
 
 function entry(data: Record<string, string>): ListEntry {
-  return { id: 'e1', index: 0, data };
+  return { id: 'e1', data };
 }
 
 function list(listId: string, entries: ListEntry[]): List {

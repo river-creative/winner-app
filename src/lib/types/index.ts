@@ -48,9 +48,20 @@ export const KEY_FIELDS = {
  * preserved: camelising MP records would change the field names existing saved lists' name and
  * card templates refer to, breaking those lists on their next sync.
  */
+/*
+ * There is no `index` field. Stored rows written before this may still carry one — it is inert
+ * and deliberately not stripped, because rewriting every entry of a list to remove a key nothing
+ * reads is precisely the whole-list write this app has spent its recent history removing.
+ *
+ * It was a position ordinal with five writers and no readers: the importer set it from the array
+ * position, the MP sync and "return to list" from the length at the moment of appending, undo
+ * put back whatever the entry had, and deleting one row renumbered the lot. Because nothing ever
+ * consulted it, no rule was enforced and none could be observed to be wrong — 1,929 of one real
+ * list's 1,938 rows disagreed with their own position, and nobody could tell. Order is the array
+ * order; identity is `id`.
+ */
 export interface ListEntry {
   id: string;
-  index: number;
   data: Record<string, string>;
   /** Set only while a draw is running, to remember which list an entry came from. Not persisted. */
   sourceListId?: string;

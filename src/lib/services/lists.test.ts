@@ -3,7 +3,7 @@ import { listAsImportSource, skipsExistingWinners, syncExclusionIds } from './li
 import type { List, ListEntry, Winner } from '$lib/types';
 
 function entry(id: string, data: Record<string, string> = {}): ListEntry {
-  return { id, index: 0, data };
+  return { id, data };
 }
 
 function list(listId: string, entries: ListEntry[], metadata?: Partial<List['metadata']>): List {

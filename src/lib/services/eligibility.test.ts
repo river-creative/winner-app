@@ -3,7 +3,7 @@ import { buildEligibility, preventsSamePrize } from './eligibility';
 import type { List, ListEntry, Prize, Winner } from '$lib/types';
 
 function entry(id: string, data: Record<string, string> = {}): ListEntry {
-  return { id, index: 0, data };
+  return { id, data };
 }
 
 function list(listId: string, entries: ListEntry[], settings?: Partial<List['metadata']>): List {
@@ -95,7 +95,7 @@ describe('buildEligibility', () => {
     const result = buildEligibility([list('a', [source], { nameConfig: '{x}' })], undefined, [], false);
     expect(result.candidates[0]?.listId).toBe('a');
     expect(result.candidates[0]?.nameConfig).toBe('{x}');
-    expect(source).toEqual({ id: '1', index: 0, data: {} });
+    expect(source).toEqual({ id: '1', data: {} });
   });
 });
 

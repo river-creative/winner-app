@@ -66,12 +66,12 @@
 
     deletingId = entryId;
     try {
-      // Re-indexed on the way out: `index` is the entry's position, and a draw that removes
-      // winners writes the surviving entries back by it. Leaving a hole makes the next removal
-      // target the wrong row.
-      const remaining = current.entries
-        .filter((candidate) => candidate.id !== entryId)
-        .map((candidate, index) => ({ ...candidate, index }));
+      // Plainly filtered by id, which is how every other removal works — `removeEntries` on the
+      // server included. This used to renumber every surviving entry as well, on the stated
+      // premise that "a draw that removes winners writes the surviving entries back by it";
+      // nothing has ever targeted a row by position, so that rewrote and re-uploaded a whole
+      // list to delete one row of it.
+      const remaining = current.entries.filter((candidate) => candidate.id !== entryId);
 
       await saveList({
         ...current,

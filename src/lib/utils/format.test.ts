@@ -11,7 +11,7 @@ import {
 import type { ListEntry, Winner } from '$lib/types';
 
 function entry(data: Record<string, string>): ListEntry {
-  return { id: 'e1', index: 0, data };
+  return { id: 'e1', data };
 }
 
 function winner(overrides: Partial<Winner> = {}): Winner {
@@ -93,10 +93,10 @@ describe('winnerCardLines', () => {
 
 describe('getEntryId', () => {
   it('prefers the entry id, then the two ticket-code spellings', () => {
-    expect(getEntryId({ id: 'a', index: 0, data: {} })).toBe('a');
-    expect(getEntryId({ id: '', index: 0, data: { 'Ticket Code': 'b' } })).toBe('b');
-    expect(getEntryId({ id: '', index: 0, data: { ticketCode: 'c' } })).toBe('c');
-    expect(getEntryId({ id: '', index: 0, data: {} })).toBeUndefined();
+    expect(getEntryId({ id: 'a', data: {} })).toBe('a');
+    expect(getEntryId({ id: '', data: { 'Ticket Code': 'b' } })).toBe('b');
+    expect(getEntryId({ id: '', data: { ticketCode: 'c' } })).toBe('c');
+    expect(getEntryId({ id: '', data: {} })).toBeUndefined();
   });
 });
 

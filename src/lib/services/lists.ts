@@ -226,7 +226,6 @@ export function buildList(input: BuiltListInput): List {
 
   const entries: ListEntry[] = input.rows.map((row, index) => ({
     id: input.ids[index] ?? generateId(),
-    index,
     data: row
   }));
 
@@ -427,7 +426,6 @@ export async function syncListFromMp(list: List): Promise<SyncResult> {
       knownIds.add(entryId);
       newEntries.push({
         id: entryId,
-        index: list.entries.length + newEntries.length,
         data: mpRecordToRow(record)
       });
     }

@@ -155,7 +155,7 @@ class WinnerActionsStore {
 
     const updated: List = {
       ...current,
-      entries: [...current.entries, { id: winner.entryId, index: current.entries.length, data: winner.data }],
+      entries: [...current.entries, { id: winner.entryId, data: winner.data }],
       metadata: { ...current.metadata, entryCount: current.entries.length + 1 }
     };
 
