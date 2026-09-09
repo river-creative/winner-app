@@ -35,6 +35,11 @@ tasks
 dev
 .claude
 
+# The captured copy of the host's live compose file. It is committed byte-identical so that
+#     diff <(ssh rmi-services cat /srv/winner-app/compose.yml) deploy/compose.rmi-services.yml
+# means something; reformatting it would silently destroy the one property it exists to have.
+deploy/compose.rmi-services.yml
+
 # Standalone helpers and config that predate this setup
 test-console.cjs
 test-texting.html
