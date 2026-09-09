@@ -1,0 +1,69 @@
+# winner-app on rmi-services.
+#
+#   docker compose --project-directory /srv/winner-app -f /srv/winner-app/compose.yml up -d --build
+#
+# Differences from the app's own docker-compose.yml, and why:
+#
+#   * NO published port. The original binds 127.0.0.1:3001 for a host nginx —
+#     the Elestio pattern. Here Traefik reaches the container over the `web`
+#     network, so nothing is bound to the host at all.
+#   * NO container_name. Traefik routes by label, not by name; a fixed name only
+#     creates collisions.
+#   * Resource limits and log rotation, required at this host's app density.
+#   * data/ stays a BIND mount rather than a named volume: it is a handful of
+#     JSON files that operators need to inspect, back up and — importantly —
+#     replace with the live data from the current host before any cutover.
+#     /srv is the snapshotted data disk, so it is still protected.
+
+name: winner-app
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: winner-app:1.0.0
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+    volumes:
+      # Container runs as uid 1001 (nodejs); the host directory is chowned to match.
+      - ./data:/app/data
+    networks:
+      - web
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: web
+
+      # Production hostname. Cut over 2026-09-02: the eNom `win` CNAME (which
+      # pointed at tickets.revival.com) was replaced with an A record to
+      # 35.227.71.68, verified propagated on the authoritative nameservers
+      # before this rule changed — an unresolvable host makes the ACME HTTP-01
+      # challenge fail and burns Let's Encrypt's failed-validation limit.
+      traefik.http.routers.winner.rule: Host(`win.revival.com`)
+      traefik.http.routers.winner.entrypoints: websecure
+      traefik.http.routers.winner.tls: "true"
+      traefik.http.routers.winner.tls.certresolver: lets-encrypt
+      traefik.http.services.winner.loadbalancer.server.port: "3001"
+
+      # Health-aware routing: Traefik stops sending traffic to an instance that
+      # reports unhealthy, rather than blackholing requests into it.
+      traefik.http.services.winner.loadbalancer.healthcheck.path: /api/health
+      traefik.http.services.winner.loadbalancer.healthcheck.interval: 15s
+      traefik.http.services.winner.loadbalancer.healthcheck.timeout: 3s
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 1.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  web:
+    external: true
