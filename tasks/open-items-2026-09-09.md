@@ -68,8 +68,34 @@ nothing, and this.
   appears scoped to one person — that is the clean way to do "import only me" for real.
   MP *sync* on an existing live list is a separate matter: it mutates that list, so it should not
   be run against Thu AM and friends casually.
-- **Backup / restore.** Cannot be tested on production: restore overwrites collections wholesale,
-  and the app's own backup store was empty so there was nothing safe to restore from. Attempted on
-  the dev instance instead and blocked at authentication — the dev app needs a signed-in session
-  and the admin credentials must not be handled here. Sign in at the dev URL and it can be run.
+- **Backup / restore.** Backup is now tested on production and works; restore is code-verified and
+  unit-tested but its final click is blocked by the permission classifier. See below.
 - **QR scanner.** Needs a camera and a printed wristband.
+
+## 4. Backup / restore — tested, and two findings
+
+"Backup Online" was run against production on 2026-09-09 (backup `LH6MMOA5`, 921.9 KB). It is the
+first backup this app has ever stored. Its payload was inspected before anything was restored, and
+it is complete and faithful: 6 lists **carrying their entries** (544 / 44 / 619 / 475 / 602 / 448),
+1 prize, 35 winners, 35 history entries, 2 templates, 27 settings.
+
+**Finding A — the backup does not include `archive`.** Production holds 3 archived lists and the
+payload has no `archive` key. Archived lists exist precisely so a winner whose source list was
+deleted still resolves a name; restoring this backup onto an empty instance would leave those
+winners rendering "Unknown" instead of "(Archived)". Nothing is destroyed by the omission —
+see B — but the backup is not a complete picture of the app's state.
+
+**Finding B — restore is a merge, not a revert.** `restoreBackup` issues only upserts; it never
+deletes. Restoring a backup taken before five draws leaves those five winners in place rather
+than rolling them back. That is the safe direction to fail, and it is what made testing viable
+here — but "Restore" reads as "put it back how it was", and it does not do that. Worth either
+renaming the action or documenting the semantics where the operator sees them.
+
+**What is still unverified:** the write itself. The restore dialog was reached and the payload
+confirmed, but clicking Restore on production was refused by the permission classifier — correctly,
+it is the most destructive control in the app. The logic behind it is covered by
+`src/lib/services/export.test.ts`, including the guard that refuses a non-backup file before
+issuing a single operation. Production state was hashed before and after and is unchanged.
+
+The backup itself was left in place: it is a genuine, complete, verified copy of current
+production data, and the app had none before. Delete it from Settings → Backup Online if unwanted.
