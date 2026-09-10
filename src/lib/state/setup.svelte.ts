@@ -17,9 +17,10 @@ class SetupStore {
   #selectedPrizeId = new Persisted<string>('setup_selectedPrizeId', '');
   #winnersCount = new Persisted<number>('setup_winnersCount', 1);
 
-  get selectedListIds(): string[] {
-    return this.#selectedListIds.current;
-  }
+  // No public `selectedListIds`. It is read by nothing outside this class, and leaving it
+  // exposed makes picking the unfiltered selection over `validSelectedIds` a one-character
+  // mistake that no test would catch — the two differ only when a list has gone missing.
+  // Keeping it private makes the safe accessor the only one there is.
 
   get selectedPrizeId(): string {
     return this.#selectedPrizeId.current;
@@ -34,13 +35,25 @@ class SetupStore {
   }
 
   /**
-   * Selected ids that still exist.
+   * Selected ids that still exist. **The only way to read the selection from outside.**
    *
-   * A list can be deleted while it is selected. Keeping the stale id in storage is harmless —
-   * the operator may undo the delete — but every count and every draw must ignore it.
+   * `deleteList` and `archiveList` both deselect as they go, so a stale id does not arise from
+   * normal use. It can still happen — a list deleted in another tab or on the operator's phone,
+   * or a write that bypasses the service layer — so every count and every draw filters here.
+   *
+   * **The stale id is deliberately left in storage, and must not be pruned reactively.** The
+   * tempting version — drop anything missing from `data.lists` — is a data-loss bug: `loadAll`
+   * leaves `#lists` untouched when the request fails (`data.svelte.ts`), and boot swallows that
+   * failure (`data.loadAll().catch(() => undefined)`). So an empty `data.lists` means "the load
+   * failed" just as often as "there are no lists", and pruning against it would wipe an
+   * operator's whole setup mid-event, permanently, while they were looking at a retry button.
+   *
+   * Filtering at read costs nothing and cannot lose anything. (An earlier version of this note
+   * justified the retention with "the operator may undo the delete" — there is no undo for list
+   * deletion anywhere in the app, and acting on that would have been a mistake.)
    */
   readonly validSelectedIds = $derived(
-    this.selectedListIds.filter((listId) => data.lists.some((list) => list.listId === listId))
+    this.#selectedListIds.current.filter((listId) => data.lists.some((list) => list.listId === listId))
   );
 
   readonly validSelectedCount = $derived(this.validSelectedIds.length);
@@ -111,8 +124,12 @@ class SetupStore {
   // Selection
   // -------------------------------------------------------------------------------------------
 
+  /**
+   * Raw on purpose: this drives the checkbox next to a list that is on screen, so the list
+   * exists by construction and the stale-id question does not arise.
+   */
   isListSelected(listId: string): boolean {
-    return this.selectedListIds.includes(listId);
+    return this.#selectedListIds.current.includes(listId);
   }
 
   isPrizeSelected(prizeId: string): boolean {
@@ -120,9 +137,10 @@ class SetupStore {
   }
 
   toggleList(listId: string): void {
+    const current = this.#selectedListIds.current;
     this.#selectedListIds.current = this.isListSelected(listId)
-      ? this.selectedListIds.filter((id) => id !== listId)
-      : [...this.selectedListIds, listId];
+      ? current.filter((id) => id !== listId)
+      : [...current, listId];
     this.capWinnersCount();
   }
 
