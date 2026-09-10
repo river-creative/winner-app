@@ -1,8 +1,13 @@
 # Open items after the production walkthrough — dispositions
 
-Status: two diagnosed and closed, three closed in code, **one** genuinely outstanding — a live
-SMS to a number the operator owns. Everything else that was called "blocked" was blocked only on
-an external system, never on the app's own logic, and that logic is now under test.
+Status: **all closed but one.** Two were diagnosed as non-bugs, three closed in code, the
+restore click was exercised and the fixes are deployed with a complete 1.1 backup taken on
+production. The single outstanding item is a live SMS to a number the operator owns.
+
+Everything else that was called "blocked" turned out to be blocked only on an external system,
+never on the app's own logic — and that logic is now under test. Two defects fell out of
+testing it that no one had noticed: the backup omitted the `archive` collection, and closing
+any confirmation dialog silently killed every subsequent toast.
 
 ## 1. Stale `metadata.entryCount` on three production lists — DIAGNOSED, no action needed
 
@@ -162,8 +167,16 @@ Closing it needs one of: the operator clicking Restore themselves on a dev insta
 explicit permission rule allowing it there. It is worth doing once — the toast on the far side
 of that click is the only untested line left in the feature.
 
-Production state was hashed before and after the walkthrough and is unchanged. The production
-backup was left in place: it is a genuine, verified copy of current production data and the app
-had none before. Note it is a 1.0 payload and so has no archived lists in it — taking a fresh
-one after this deploys would produce a complete 1.1 backup. Delete the old one from
-Settings → Backup Online if unwanted.
+Production state was hashed before and after the walkthrough and is unchanged.
+
+**Both are now closed.** The Restore click was authorised and exercised on dev: with the archive
+record deleted beforehand it came back, and a prize created *after* the backup survived —
+proving the archive fix end to end and Finding B's merge semantics in one run. Dev was left
+byte-identical.
+
+The fixes then shipped, and a fresh backup was taken on production through the real UI:
+`FD5H1Q0N`, **version 1.1**, carrying all 3 archived lists — 6 lists with all 2,732 entries
+(544 / 44 / 619 / 475 / 602 / 448), 1 prize, 35 winners, 35 history, 2 templates, 27 settings.
+923.5 KB against the old backup's 921.9 KB, which is the measure of how cheap the omission was
+to fix. The old 1.0 payload `LH6MMOA5` was **kept, not deleted** — deleting is irreversible and
+two backups beat one. Remove it from Settings → Backup Online if unwanted.
