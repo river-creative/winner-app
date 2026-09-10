@@ -58,7 +58,10 @@
 
     const confirmed = await ui.confirm({
       title: 'Restore from file',
-      message: `Restore everything from "${file.name}"? Records with the same id are overwritten.`,
+      // "Restore" reads as "put it back how it was", and it does not do that: the write is all
+      // upserts and never deletes, so a draw run after the backup was taken survives it. Saying
+      // so here is the difference between a safe operation and a surprising one.
+      message: `Restore everything from "${file.name}"? Records with the same id are overwritten. This merges rather than rolls back — anything created since the backup was taken is kept.`,
       confirmText: 'Restore',
       variant: 'danger'
     });
@@ -120,7 +123,8 @@
   async function restoreOnline(backup: Backup) {
     const confirmed = await ui.confirm({
       title: 'Restore backup',
-      message: `Restore "${backup.name}"? Records with the same id are overwritten.`,
+      // Same semantics as the from-file restore above, and the same reason for spelling them out.
+      message: `Restore "${backup.name}"? Records with the same id are overwritten. This merges rather than rolls back — anything created since the backup was taken is kept.`,
       confirmText: 'Restore',
       variant: 'danger'
     });
