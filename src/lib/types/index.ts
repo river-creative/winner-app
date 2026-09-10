@@ -259,6 +259,15 @@ export interface BackupPayload {
   winners: Winner[];
   history: HistoryEntry[];
   templates: Template[];
+  /**
+   * Archived lists. Added in backup version 1.1 — a 1.0 payload has no `archive` key, which is
+   * why every reader of this field tolerates its absence.
+   *
+   * Omitting it made the backup an incomplete picture of the app: a winner whose source list was
+   * archived reads its name out of here, so restoring onto an empty instance rendered those
+   * winners "Unknown" instead of "(Archived)".
+   */
+  archive: ArchivedList[];
   settings: Settings;
 }
 

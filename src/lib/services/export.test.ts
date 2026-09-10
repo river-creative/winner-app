@@ -23,7 +23,7 @@ vi.mock('$lib/api/client', () => ({
   deleteBackup: vi.fn()
 }));
 
-const { restoreBackup } = await import('./export');
+const { buildBackupPayload, restoreBackup } = await import('./export');
 
 const backup = (over: Record<string, unknown> = {}) => ({
   version: '2.0.0',
@@ -32,6 +32,7 @@ const backup = (over: Record<string, unknown> = {}) => ({
   winners: [],
   history: [],
   templates: [],
+  archive: [],
   settings: {},
   ...over
 });
@@ -46,6 +47,30 @@ const list = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   batchSave.mockResolvedValue({ results: [], writeResults: {} });
+});
+
+describe('buildBackupPayload', () => {
+  // Found by inspecting a real production backup: `archive` was missing from it. Archived lists
+  // are how a winner whose source list is gone still renders "(Archived)" instead of "Unknown",
+  // so a backup without them is not a complete picture of the app.
+  it('collects every collection the app stores, archive included', async () => {
+    getAll.mockImplementation(async (collection: string) =>
+      collection === 'settings' ? [{ key: 'preSelectionDelay', value: 3 }] : [{ id: collection }]
+    );
+
+    const payload = await buildBackupPayload();
+
+    expect(getAll.mock.calls.map(([c]) => c).sort()).toEqual([
+      'archive',
+      'history',
+      'lists',
+      'prizes',
+      'settings',
+      'templates',
+      'winners'
+    ]);
+    expect(payload.archive).toEqual([{ id: 'archive' }]);
+  });
 });
 
 describe('restoreBackup', () => {
@@ -65,6 +90,7 @@ describe('restoreBackup', () => {
         winners: [{ winnerId: 'w1' }],
         history: [{ historyId: 'h1' }],
         templates: [{ templateId: 't1' }],
+        archive: [{ listId: 'a1', metadata: { listId: 'a1', name: 'Gone' }, archivedAt: 1 }],
         settings: { preSelectionDelay: 3, selectionMode: 'sequential' }
       })
     );
@@ -75,14 +101,30 @@ describe('restoreBackup', () => {
       acc[o.collection] = (acc[o.collection] ?? 0) + 1;
       return acc;
     }, {});
-    expect(byCollection).toEqual({ lists: 1, prizes: 1, winners: 1, history: 1, templates: 1, settings: 2 });
+    expect(byCollection).toEqual({
+      lists: 1,
+      prizes: 1,
+      winners: 1,
+      history: 1,
+      templates: 1,
+      archive: 1,
+      settings: 2
+    });
   });
 
   it('reports back exactly what it restored', async () => {
     const summary = await restoreBackup(
       backup({ lists: [list(), list({ listId: 'l2' })], winners: [{ winnerId: 'w1' }], settings: { a: 1 } })
     );
-    expect(summary).toEqual({ lists: 2, prizes: 0, winners: 1, history: 0, templates: 0, settings: 1 });
+    expect(summary).toEqual({
+      lists: 2,
+      prizes: 0,
+      winners: 1,
+      history: 0,
+      templates: 0,
+      archive: 0,
+      settings: 1
+    });
   });
 
   // A falsy or pre-1971 lastSyncAt used to render as "Synced 12/31/1969" on every list that had
@@ -114,7 +156,35 @@ describe('restoreBackup', () => {
 
   it('accepts a backup whose optional collections are absent', async () => {
     const summary = await restoreBackup({ version: '2.0.0' });
-    expect(summary).toEqual({ lists: 0, prizes: 0, winners: 0, history: 0, templates: 0, settings: 0 });
+    expect(summary).toEqual({
+      lists: 0,
+      prizes: 0,
+      winners: 0,
+      history: 0,
+      templates: 0,
+      archive: 0,
+      settings: 0
+    });
     expect(batchSave).toHaveBeenCalledWith([]);
+  });
+
+  // Backups taken before 1.1 have no `archive` key at all, and one of them is sitting on
+  // production right now. Restoring it must write the collections it does have rather than fail.
+  it('restores a 1.0 backup, which predates the archive collection', async () => {
+    const summary = await restoreBackup({
+      version: '1.0',
+      lists: [list()],
+      prizes: [],
+      winners: [{ winnerId: 'w1' }],
+      history: [],
+      templates: [],
+      settings: {}
+    });
+
+    expect(summary.archive).toBe(0);
+    expect(summary.lists).toBe(1);
+    const ops = batchSave.mock.calls[0]?.[0] as Array<{ collection: string }>;
+    expect(ops.some((o) => o.collection === 'archive')).toBe(false);
+    expect(ops.some((o) => o.collection === 'lists')).toBe(true);
   });
 });

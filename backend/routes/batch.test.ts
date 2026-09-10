@@ -81,6 +81,10 @@ const restoreOperations = () => [
   { collection: 'winners', data: { winnerId: 'w1', displayName: 'A Winner', prize: 'Prize' } },
   { collection: 'history', data: { historyId: 'h1', prize: 'Prize', winners: [] } },
   { collection: 'templates', data: { templateId: 't1', name: 'T', message: 'hi', isDefault: true } },
+  {
+    collection: 'archive',
+    data: { listId: 'a1', metadata: { listId: 'a1', name: 'A deleted list' }, archivedAt: 1 }
+  },
   { collection: 'settings', data: { key: 'preSelectionDelay', value: 3 } },
   { collection: 'settings', data: { key: 'selectionMode', value: 'sequential' } }
 ];
@@ -95,6 +99,9 @@ describe('POST /batch-save — the write a restore performs', () => {
     expect((await readCollection('winners'))[0].winnerId).toBe('w1');
     expect((await readCollection('history'))[0].historyId).toBe('h1');
     expect((await readCollection('templates'))[0].templateId).toBe('t1');
+    // Archived lists are keyed by listId, not by an id field, so they land in their own file
+    // under their own key — worth asserting, because the backup omitted them entirely until 1.1.
+    expect((await readCollection('archive'))[0].listId).toBe('a1');
     expect(await readCollection('settings')).toHaveLength(2);
   });
 

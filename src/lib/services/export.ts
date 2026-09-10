@@ -4,7 +4,11 @@ import type { Backup, BackupPayload, Winner } from '$lib/types';
 import { toCsv } from '$lib/utils/csv';
 import { generateBackupId } from '$lib/utils/id';
 
-const BACKUP_VERSION = '1.0';
+/**
+ * 1.1 added the `archive` collection. Nothing branches on this — `isBackupPayload` only checks
+ * that it is a string — so a 1.0 file still restores; it simply carries no archived lists.
+ */
+const BACKUP_VERSION = '1.1';
 
 function today(): string {
   return new Date().toISOString().split('T')[0] as string;
@@ -57,12 +61,15 @@ export function exportWinnersCsv(winners: Winner[]): void {
 
 /** Everything needed to rebuild the app's state, settings included. */
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [lists, prizes, winners, history, templates, settingRecords] = await Promise.all([
+  const [lists, prizes, winners, history, templates, archive, settingRecords] = await Promise.all([
     api.getAll('lists'),
     api.getAll('prizes'),
     api.getAll('winners'),
     api.getAll('history'),
     api.getAll('templates'),
+    // Archived lists are metadata only — no entries — so this costs a few hundred bytes and
+    // buys the winners table its "(Archived)" suffix back after a restore.
+    api.getAll('archive'),
     api.getAll('settings')
   ]);
 
@@ -79,6 +86,7 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     winners,
     history,
     templates,
+    archive,
     settings
   };
 }
@@ -94,6 +102,7 @@ export interface RestoreSummary {
   winners: number;
   history: number;
   templates: number;
+  archive: number;
   settings: number;
 }
 
@@ -150,6 +159,11 @@ export async function restoreBackup(payload: unknown): Promise<RestoreSummary> {
       collection: 'templates' as const,
       data: template as unknown as Record<string, unknown>
     })),
+    // Absent from a 1.0 payload, which is the only reason this is guarded rather than required.
+    ...(payload.archive ?? []).map((archived) => ({
+      collection: 'archive' as const,
+      data: archived as unknown as Record<string, unknown>
+    })),
     ...Object.entries(payload.settings ?? {}).map(([key, value]) => ({
       collection: 'settings' as const,
       data: { key, value }
@@ -164,6 +178,7 @@ export async function restoreBackup(payload: unknown): Promise<RestoreSummary> {
     winners: payload.winners?.length ?? 0,
     history: payload.history?.length ?? 0,
     templates: payload.templates?.length ?? 0,
+    archive: payload.archive?.length ?? 0,
     settings: Object.keys(payload.settings ?? {}).length
   };
 }
