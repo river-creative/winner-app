@@ -83,6 +83,22 @@ describe('releaseOverlays', () => {
     expect(document.contains(stack())).toBe(true);
   });
 
+  // The same class of defect by a different route. The stack is only as current as the last
+  // release call, so an outer dialog torn out of the DOM without one leaves a detached node at
+  // the top of it — and handing the overlay to that loses it exactly as before.
+  it('skips a stacked dialog that has been detached without releasing', () => {
+    render(Toasts);
+    const outer = openDialog();
+    const inner = openDialog();
+
+    // Outer goes without its cleanup running; inner then closes normally.
+    outer.remove();
+    destroyDialog(inner);
+
+    expect(document.contains(stack())).toBe(true);
+    expect(stack()?.parentElement).not.toBe(outer);
+  });
+
   // The failure is invisible from the store's side: the toast fires either way. What breaks is
   // whether anyone can see it, so that is what gets asserted.
   it('shows a toast fired after a dialog has been through its whole lifecycle', async () => {

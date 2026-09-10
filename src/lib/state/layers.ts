@@ -13,8 +13,10 @@
  * Deliberately plain module state, with no runes and no effects. The first version kept the open
  * dialog in `$state` and had each overlay follow it from its own `$effect`; the two effects then
  * invalidated each other on every pass and Svelte aborted the update, so the dialog never opened
- * at all. There is no reactivity here to get into that argument with: `Dialog.svelte` calls these
- * two functions directly, and the overlays never know it happened.
+ * at all. There is no reactivity here to get into that argument with: `Dialog.svelte` calls
+ * `adoptOverlays`/`releaseOverlays` directly, and each overlay calls `registerOverlay` once as
+ * it mounts. Those registrations are the only thing the overlays do — they never track which
+ * dialog is open, so the mutual invalidation cannot come back.
  */
 
 /** Open dialogs, oldest first. A confirmation opened from inside a form is a real flow. */
@@ -36,8 +38,21 @@ const stack: HTMLDialogElement[] = [];
  */
 const overlays = new Set<HTMLElement>();
 
+/**
+ * The topmost dialog that is still in the document, or `<body>`.
+ *
+ * The `isConnected` check is the guard, not a formality. Appending an overlay into a node that
+ * has already been detached is precisely how this module lost the toast stack for the life of
+ * the page, and the stack is only as current as the last `releaseOverlays` call. Rather than
+ * depend on every future caller unwinding it in the right order, the target is verified at the
+ * moment of use — the one point where being wrong is unrecoverable.
+ */
 function currentTarget(): HTMLElement {
-  return stack[stack.length - 1] ?? document.body;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const dialog = stack[i];
+    if (dialog?.isConnected) return dialog;
+  }
+  return document.body;
 }
 
 function moveOverlaysTo(target: HTMLElement): void {
