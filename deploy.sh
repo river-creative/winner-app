@@ -30,6 +30,20 @@ REMOTE_PATH="/srv/winner-app"
 COMPOSE_FILE="${REMOTE_PATH}/compose.yml"
 LOCAL_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/"
 
+# The identity the IAP tunnel authenticates as.
+#
+# Pinned here rather than inherited from whichever account `gcloud config` happens to hold. A
+# deploy that runs as a *user* account depends on a credential that expires and whose refresh is
+# an interactive browser prompt — "Reauthentication failed. cannot prompt during non-interactive
+# execution" is what that looks like halfway through a deploy, and it cannot be answered from a
+# script, a cron job or CI.
+#
+# `CLOUDSDK_CORE_ACCOUNT` rather than `gcloud config set account`: the ProxyCommand in
+# ~/.ssh/config runs its own gcloud, and so does rsync's ssh, and both inherit this — while the
+# operator's own active account is left exactly as they had it.
+GCLOUD_ACCOUNT="${WINNER_APP_GCLOUD_ACCOUNT:-dev-ops@clean-fin-256016.iam.gserviceaccount.com}"
+export CLOUDSDK_CORE_ACCOUNT="${GCLOUD_ACCOUNT}"
+
 # Environment variables the server validates at startup (backend/auth-config.ts).
 # Keep this list in step with loadAuthConfig() — a variable that is required there
 # and missing here turns a caught deploy error back into a crash loop.
@@ -49,11 +63,31 @@ echo "Target: ${SERVER}:${REMOTE_PATH}"
 # Step 0: Preflight — never rebuild into a configuration that cannot boot
 # ---------------------------------------------------------------------------
 echo -e "${YELLOW}🔍 Preflight checks...${NC}"
+echo "Authenticating as: ${GCLOUD_ACCOUNT}"
+
+# Checked before the tunnel is attempted, because "this machine has never been given the service
+# account's key" and "the key is fine but IAP refuses it" are different problems with the same
+# symptom — a connection that does not open.
+if ! gcloud auth list --filter="account:${GCLOUD_ACCOUNT}" --format="value(account)" 2>/dev/null | grep -q .; then
+    echo -e "${RED}❌ ${GCLOUD_ACCOUNT} has no credentials on this machine${NC}"
+    echo "   Activate its key:  gcloud auth activate-service-account --key-file=<key.json>"
+    echo "   Or deploy as another identity:  WINNER_APP_GCLOUD_ACCOUNT=you@example.com $0"
+    exit 1
+fi
 
 if ! ssh -o BatchMode=yes -o ConnectTimeout=60 "${SERVER}" true 2>/dev/null; then
-    echo -e "${RED}❌ Cannot reach ${SERVER} over SSH${NC}"
+    echo -e "${RED}❌ Cannot reach ${SERVER} over SSH as ${GCLOUD_ACCOUNT}${NC}"
     echo "   The public win.revival.com:22 is firewalled — this needs the IAP tunnel alias."
-    echo "   Check that 'ssh ${SERVER}' works and that gcloud is authenticated."
+    echo
+    echo "   'not authorized' (IAP error 4033) means the account can authenticate but may not"
+    echo "   tunnel. The role that grants it, applied by someone with IAM admin on the project:"
+    echo
+    echo "     gcloud projects add-iam-policy-binding clean-fin-256016 \\"
+    echo "       --member=serviceAccount:${GCLOUD_ACCOUNT} \\"
+    echo "       --role=roles/iap.tunnelResourceAccessor"
+    echo
+    echo "   SSH into the VM itself is by key (~/.ssh/google_compute_engine), not by this"
+    echo "   account — so a key problem looks the same here and is fixed separately."
     exit 1
 fi
 
