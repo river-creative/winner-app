@@ -104,3 +104,17 @@ describe('a selected list that no longer exists', () => {
     expect(setup.validSelectedIds).toEqual(['real-a']);
   });
 });
+
+describe('a selected prize that no longer exists', () => {
+  // The same shape as the list case, and the same reason the raw id is not readable from
+  // outside: it stays truthy after the prize is gone, so branching on it would let a draw start
+  // with no prize behind it. `selectedPrize` is the read that tells the truth.
+  it('resolves to no prize, and blocks the draw', () => {
+    setup.selectList('real-a');
+    setup.selectPrize('prize-that-was-deleted');
+
+    expect(setup.selectedPrize).toBeUndefined();
+    expect(setup.prizeDisplayText).toBe('Not Selected');
+    expect(setup.canStart).toBe(false);
+  });
+});

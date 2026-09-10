@@ -22,9 +22,10 @@ class SetupStore {
   // mistake that no test would catch — the two differ only when a list has gone missing.
   // Keeping it private makes the safe accessor the only one there is.
 
-  get selectedPrizeId(): string {
-    return this.#selectedPrizeId.current;
-  }
+  // Nor a public `selectedPrizeId`, for the same reason: a prize can be deleted while it is
+  // selected, and the raw id outlives it. `selectedPrize` is the guarded read — it resolves
+  // through `data.prizeById` and goes `undefined` the moment the prize is gone — so an id that
+  // still looks truthy is exactly the wrong thing to branch on from outside.
 
   get winnersCount(): number {
     return this.#winnersCount.current;
@@ -75,7 +76,7 @@ class SetupStore {
   );
 
   readonly selectedPrize = $derived<Prize | undefined>(
-    this.selectedPrizeId ? data.prizeById(this.selectedPrizeId) : undefined
+    this.#selectedPrizeId.current ? data.prizeById(this.#selectedPrizeId.current) : undefined
   );
 
   /**
@@ -132,8 +133,9 @@ class SetupStore {
     return this.#selectedListIds.current.includes(listId);
   }
 
+  /** Raw for the same reason as `isListSelected`: it drives the row of a prize on screen. */
   isPrizeSelected(prizeId: string): boolean {
-    return String(this.selectedPrizeId) === String(prizeId);
+    return String(this.#selectedPrizeId.current) === String(prizeId);
   }
 
   toggleList(listId: string): void {
