@@ -269,6 +269,17 @@ export interface BackupPayload {
    */
   archive: ArchivedList[];
   settings: Settings;
+  /**
+   * Ministry Platform query definitions. Added in backup version 1.2; absent from 1.0 and 1.1,
+   * so every reader tolerates its absence exactly as `archive` does.
+   *
+   * These were missed for a structural reason rather than an oversight: the payload is assembled
+   * from `api.getAll(<collection>)`, and `mp` is not one of the eight whitelisted collections —
+   * it lives in `data/mp.json` behind its own router. A backup built from collections therefore
+   * could not see it, and restoring onto a fresh instance left the app unable to import from
+   * Ministry Platform at all until the queries were rebuilt by hand.
+   */
+  mpQueries?: MpQuery[];
 }
 
 export interface Backup {

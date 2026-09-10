@@ -13,10 +13,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const batchSave = vi.fn();
 const getAll = vi.fn();
+const mpGetQueries = vi.fn();
+const mpCreateQuery = vi.fn();
+const mpUpdateQuery = vi.fn();
 
 vi.mock('$lib/api/client', () => ({
   batchSave: (...a: unknown[]) => batchSave(...a),
   getAll: (...a: unknown[]) => getAll(...a),
+  // MP queries are not a collection — they have their own endpoints, which is exactly why they
+  // went missing from every backup before 1.2.
+  mpGetQueries: (...a: unknown[]) => mpGetQueries(...a),
+  mpCreateQuery: (...a: unknown[]) => mpCreateQuery(...a),
+  mpUpdateQuery: (...a: unknown[]) => mpUpdateQuery(...a),
   createBackup: vi.fn(),
   getBackups: vi.fn(),
   getBackup: vi.fn(),
@@ -47,6 +55,9 @@ const list = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   batchSave.mockResolvedValue({ results: [], writeResults: {} });
+  mpGetQueries.mockResolvedValue([]);
+  mpCreateQuery.mockResolvedValue({});
+  mpUpdateQuery.mockResolvedValue({});
 });
 
 describe('buildBackupPayload', () => {
@@ -70,6 +81,31 @@ describe('buildBackupPayload', () => {
       'winners'
     ]);
     expect(payload.archive).toEqual([{ id: 'archive' }]);
+  });
+
+  // Found the same way as `archive`: by reading a real production payload. MP queries are not a
+  // collection, so a payload assembled from `getAll` could never contain them — and a restore
+  // onto a fresh instance left the app unable to import from Ministry Platform at all.
+  it('collects the MP queries, which no collection call can reach', async () => {
+    getAll.mockResolvedValue([]);
+    mpGetQueries.mockResolvedValue([{ id: 'main-event', name: 'Main Event' }]);
+
+    const payload = await buildBackupPayload();
+
+    expect(payload.mpQueries).toEqual([{ id: 'main-event', name: 'Main Event' }]);
+    expect(payload.version).toBe('1.2');
+  });
+
+  // The queries are the one part fetched outside the collection batch, so they are the one part
+  // that can fail on its own. Losing them must not cost the operator the rest of the backup.
+  it('still produces a payload when the MP queries cannot be read', async () => {
+    getAll.mockResolvedValue([]);
+    mpGetQueries.mockRejectedValue(new Error('MP unreachable'));
+
+    const payload = await buildBackupPayload();
+
+    expect(payload.mpQueries).toEqual([]);
+    expect(payload.lists).toEqual([]);
   });
 });
 
@@ -123,7 +159,8 @@ describe('restoreBackup', () => {
       history: 0,
       templates: 0,
       archive: 0,
-      settings: 1
+      settings: 1,
+      mpQueries: 0
     });
   });
 
@@ -163,9 +200,46 @@ describe('restoreBackup', () => {
       history: 0,
       templates: 0,
       archive: 0,
-      settings: 0
+      settings: 0,
+      mpQueries: 0
     });
     expect(batchSave).toHaveBeenCalledWith([]);
+    // No queries in the payload means the MP endpoints are never touched — a pre-1.2 backup must
+    // not read or write them just to discover there is nothing to do.
+    expect(mpGetQueries).not.toHaveBeenCalled();
+  });
+
+  // Upsert, not blind create: restoring onto a live instance must not duplicate the queries the
+  // operator is already using, and must still bring back one that was deleted.
+  it('updates an MP query that still exists and creates one that does not', async () => {
+    mpGetQueries.mockResolvedValue([{ id: 'kept', name: 'Kept' }]);
+
+    const summary = await restoreBackup(
+      backup({
+        mpQueries: [
+          { id: 'kept', name: 'Kept, renamed' },
+          { id: 'gone', name: 'Deleted since the backup' }
+        ]
+      })
+    );
+
+    expect(mpUpdateQuery).toHaveBeenCalledWith('kept', { id: 'kept', name: 'Kept, renamed' });
+    expect(mpCreateQuery).toHaveBeenCalledWith({ id: 'gone', name: 'Deleted since the backup' });
+    expect(summary.mpQueries).toBe(2);
+  });
+
+  // The collections write atomically in one batch; the queries cannot ride it. A query that
+  // fails must not turn a restore that recovered every list into a thrown error.
+  it('counts a failed query rather than losing the whole restore', async () => {
+    mpGetQueries.mockResolvedValue([]);
+    mpCreateQuery.mockRejectedValueOnce(new Error('refused')).mockResolvedValueOnce({});
+
+    const summary = await restoreBackup(
+      backup({ lists: [list()], mpQueries: [{ id: 'bad' }, { id: 'good' }] })
+    );
+
+    expect(summary.lists).toBe(1);
+    expect(summary.mpQueries).toBe(1);
   });
 
   // Backups taken before 1.1 have no `archive` key at all, and one of them is sitting on

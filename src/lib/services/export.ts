@@ -1,14 +1,15 @@
 import * as api from '$lib/api/client';
 import { mergeSettings } from '$lib/constants/settings';
-import type { Backup, BackupPayload, Winner } from '$lib/types';
+import type { Backup, BackupPayload, MpQuery, Winner } from '$lib/types';
 import { toCsv } from '$lib/utils/csv';
 import { generateBackupId } from '$lib/utils/id';
 
 /**
- * 1.1 added the `archive` collection. Nothing branches on this — `isBackupPayload` only checks
- * that it is a string — so a 1.0 file still restores; it simply carries no archived lists.
+ * 1.1 added the `archive` collection; 1.2 added the Ministry Platform queries. Nothing branches
+ * on this — `isBackupPayload` only checks that it is a string — so older files still restore;
+ * they simply carry no archived lists, or no queries, and the restore skips what is absent.
  */
-const BACKUP_VERSION = '1.1';
+const BACKUP_VERSION = '1.2';
 
 function today(): string {
   return new Date().toISOString().split('T')[0] as string;
@@ -61,7 +62,7 @@ export function exportWinnersCsv(winners: Winner[]): void {
 
 /** Everything needed to rebuild the app's state, settings included. */
 export async function buildBackupPayload(): Promise<BackupPayload> {
-  const [lists, prizes, winners, history, templates, archive, settingRecords] = await Promise.all([
+  const [lists, prizes, winners, history, templates, archive, settingRecords, mpQueries] = await Promise.all([
     api.getAll('lists'),
     api.getAll('prizes'),
     api.getAll('winners'),
@@ -70,7 +71,12 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     // Archived lists are metadata only — no entries — so this costs a few hundred bytes and
     // buys the winners table its "(Archived)" suffix back after a restore.
     api.getAll('archive'),
-    api.getAll('settings')
+    api.getAll('settings'),
+    // NOT a collection: MP queries live in data/mp.json behind their own router, which is
+    // precisely why they were missing from every backup before 1.2. Fetched through the same
+    // client the Queries screen uses, so a query the app can read is a query it can restore.
+    // A failure here must not cost the operator the rest of the backup.
+    api.mpGetQueries().catch(() => [])
   ]);
 
   // Rebuilt from the server's own `{key, value}` rows rather than read off a property that did
@@ -87,7 +93,8 @@ export async function buildBackupPayload(): Promise<BackupPayload> {
     history,
     templates,
     archive,
-    settings
+    settings,
+    mpQueries
   };
 }
 
@@ -104,6 +111,8 @@ export interface RestoreSummary {
   templates: number;
   archive: number;
   settings: number;
+  /** How many MP query definitions landed. Absent from a pre-1.2 payload, so legitimately 0. */
+  mpQueries: number;
 }
 
 function isBackupPayload(value: unknown): value is BackupPayload {
@@ -172,6 +181,8 @@ export async function restoreBackup(payload: unknown): Promise<RestoreSummary> {
 
   await api.batchSave(operations);
 
+  const mpQueries = await restoreMpQueries(payload.mpQueries ?? []);
+
   return {
     lists: lists.length,
     prizes: payload.prizes?.length ?? 0,
@@ -179,8 +190,41 @@ export async function restoreBackup(payload: unknown): Promise<RestoreSummary> {
     history: payload.history?.length ?? 0,
     templates: payload.templates?.length ?? 0,
     archive: payload.archive?.length ?? 0,
-    settings: Object.keys(payload.settings ?? {}).length
+    settings: Object.keys(payload.settings ?? {}).length,
+    mpQueries
   };
+}
+
+/**
+ * Put the Ministry Platform queries back, one at a time.
+ *
+ * They cannot ride the batch: `batch-save` addresses collections, and `mp` is not one — the
+ * queries live in `data/mp.json` behind a router with only per-id endpoints. So this upserts,
+ * updating a query that still exists and creating one that does not, which is what makes a
+ * restore onto a live instance safe rather than a duplicate-maker.
+ *
+ * Runs AFTER the batch on purpose. The collections are the part an operator is usually restoring
+ * and the part that writes atomically; a query failing here must not take that with it. Failures
+ * are counted rather than thrown for the same reason — the summary reports how many landed, and
+ * a restore that recovered every list is not a failure because one query definition did not.
+ */
+async function restoreMpQueries(queries: MpQuery[]): Promise<number> {
+  if (queries.length === 0) return 0;
+
+  const existing = await api.mpGetQueries().catch(() => [] as MpQuery[]);
+  const known = new Set(existing.map((query) => query.id));
+
+  let restored = 0;
+  for (const query of queries) {
+    try {
+      if (known.has(query.id)) await api.mpUpdateQuery(query.id, query);
+      else await api.mpCreateQuery(query);
+      restored += 1;
+    } catch {
+      /* counted by omission; the summary is what the operator is shown */
+    }
+  }
+  return restored;
 }
 
 export async function readBackupFile(file: File): Promise<unknown> {
