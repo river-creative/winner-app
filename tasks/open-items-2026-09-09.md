@@ -109,24 +109,35 @@ needs hardware or someone else's production system, and the half that does not.
   defence-in-depth and has been left in place; the test asserts the behaviour rather than
   either guard, and says why in a comment.
 
-## 4. Backup / restore — tested, and two findings
+## 4. Backup / restore — tested, two findings, both now fixed
 
 "Backup Online" was run against production on 2026-09-09 (backup `LH6MMOA5`, 921.9 KB). It is the
 first backup this app has ever stored. Its payload was inspected before anything was restored, and
 it is complete and faithful: 6 lists **carrying their entries** (544 / 44 / 619 / 475 / 602 / 448),
 1 prize, 35 winners, 35 history entries, 2 templates, 27 settings.
 
-**Finding A — the backup does not include `archive`.** Production holds 3 archived lists and the
-payload has no `archive` key. Archived lists exist precisely so a winner whose source list was
-deleted still resolves a name; restoring this backup onto an empty instance would leave those
-winners rendering "Unknown" instead of "(Archived)". Nothing is destroyed by the omission —
-see B — but the backup is not a complete picture of the app's state.
+**Finding A — the backup did not include `archive`. FIXED (`c33ad03`).** Production holds 3
+archived lists and the payload had no `archive` key. Archived lists exist precisely so a winner
+whose source list was deleted still resolves a name; restoring that backup onto an empty instance
+would have left those winners rendering "Unknown" instead of "(Archived)". Nothing was destroyed
+by the omission — see B — but the backup was not a complete picture of the app's state.
 
-**Finding B — restore is a merge, not a revert.** `restoreBackup` issues only upserts; it never
-deletes. Restoring a backup taken before five draws leaves those five winners in place rather
-than rolling them back. That is the safe direction to fail, and it is what made testing viable
-here — but "Restore" reads as "put it back how it was", and it does not do that. Worth either
-renaming the action or documenting the semantics where the operator sees them.
+`buildBackupPayload` now reads the collection and `restoreBackup` writes it, at backup version
+1.1. Nothing branches on the version, so the 1.0 backup sitting on production still restores; it
+simply carries no archived lists, and there is a test for exactly that payload. Verified against
+a running instance, not only in tests: a backup taken through the real gear menu came back 1.1
+with the archived list in it, and deleting `api.getAll('archive')` turns the new test red.
+
+**Finding B — restore is a merge, not a revert. Now SAID SO (`61619d1`).** `restoreBackup`
+issues only upserts; it never deletes. Restoring a backup taken before five draws leaves those
+five winners in place rather than rolling them back. That is the safe direction to fail, and it
+is what made testing viable here — but "Restore" reads as "put it back how it was".
+
+The behaviour was left alone and the copy fixed instead: making restore actually revert would
+mean deleting records the operator can no longer see, which is a far worse failure than the one
+being solved. Both confirm dialogs — from file and from server — now read "This merges rather
+than rolls back — anything created since the backup was taken is kept." Verified live by opening
+the dialog through the real menu and reading the copy off the rendered element.
 
 **The write is now exercised — over real HTTP, onto a real disk.** Clicking Restore on production
 was refused by the permission classifier, correctly: it is the most destructive control in the
@@ -140,8 +151,19 @@ and the entry-level `removeEntries`/`restoreEntries` operations round-trip with 
 correct. The client half — including the guard that refuses a non-backup file before issuing a
 single operation — is covered by `src/lib/services/export.test.ts`.
 
-What remains unverified is only the browser event: the click, the dialog, the toast. Production
-state was hashed before and after the walkthrough and is unchanged.
+**What remains unverified is one click.** Everything either side of it is now covered: the gear
+menu, the backup dialog, the stored payload, the restore list, the confirm dialog and its copy
+were all driven on a live instance; the write itself is covered over real HTTP onto real disk.
+Only the Restore button's own click is untested, and the permission classifier refuses it — on
+the dev instance as firmly as on production. It is the most destructive control in the app, so
+that refusal is working as intended, and it was not routed around.
 
-The backup itself was left in place: it is a genuine, complete, verified copy of current
-production data, and the app had none before. Delete it from Settings → Backup Online if unwanted.
+Closing it needs one of: the operator clicking Restore themselves on a dev instance, or an
+explicit permission rule allowing it there. It is worth doing once — the toast on the far side
+of that click is the only untested line left in the feature.
+
+Production state was hashed before and after the walkthrough and is unchanged. The production
+backup was left in place: it is a genuine, verified copy of current production data and the app
+had none before. Note it is a 1.0 payload and so has no archived lists in it — taking a fresh
+one after this deploys would produce a complete 1.1 backup. Delete the old one from
+Settings → Backup Online if unwanted.
