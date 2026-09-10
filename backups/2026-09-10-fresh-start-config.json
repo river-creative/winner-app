@@ -1,0 +1,395 @@
+{
+  "backupId": "0LZT66BT",
+  "name": "Fresh Start",
+  "timestamp": 1789068949390,
+  "description": "Backup created at 9/10/2026, 3:35:49 PM",
+  "data": {
+    "version": "1.2",
+    "timestamp": 1789068949455,
+    "lists": [],
+    "prizes": [],
+    "winners": [],
+    "history": [],
+    "templates": [
+      {
+        "templateId": "tmpl_default",
+        "name": "Default Winner Notification",
+        "message": "Congratulations {name}! You won {prize}. Your code: {contactId}",
+        "isDefault": false,
+        "createdAt": "2026-09-01T04:14:17.687Z"
+      },
+      {
+        "templateId": "tmpl_1788379439001",
+        "name": "Default Template",
+        "message": "🎉 Congratulations, {name}! \n\nYou've won a {prize} in the drawing! \n\n🏆 Show this text at the stage within 60 seconds of receiving this text, and have your wristband scanned for verification to claim your prize.",
+        "isDefault": true,
+        "updatedAt": "2026-09-03T06:03:02.325Z"
+      }
+    ],
+    "archive": [],
+    "settings": {
+      "preventDuplicates": true,
+      "preventSamePrize": true,
+      "hideEntryCounts": true,
+      "enableDebugLogs": true,
+      "skipExistingWinners": true,
+      "enableWebhook": false,
+      "webhookUrl": "",
+      "fontFamily": "Open Sans",
+      "primaryColor": "#c23b21",
+      "secondaryColor": "#dd5d40",
+      "selectionColor": "#10b981",
+      "backgroundType": "image",
+      "customBackgroundImage": "/uploads/background-1788418233237-927679075.jpg",
+      "displayRatio": "fit",
+      "displayFontSize": "default",
+      "selectionMode": "sequential",
+      "displayEffect": "fade-in",
+      "displayDuration": 0.5,
+      "stableGrid": false,
+      "preSelectionDelay": 3,
+      "delayVisualType": "time-machine",
+      "soundDuringDelay": "drum-roll",
+      "soundEndOfDelay": "sting-rimshot-drum-roll",
+      "soundDuringReveal": "applause-winner",
+      "celebrationEffect": "confetti",
+      "celebrationDuration": 4,
+      "celebrationAutoTrigger": true
+    },
+    "mpQueries": [
+      {
+        "id": "main-event-mauch",
+        "name": "Mauch | Sun AM",
+        "description": "Get participants",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Participant_ID_Table_Contact_ID_Table.Last_Name = 'Mauch' AND Event_Participants.Group_ID IN (522)",
+        "category": "Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true,
+            "value": "71509,71510"
+          }
+        },
+        "metadata": {
+          "category": "Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "main-event-sun-am",
+        "name": "Main Event",
+        "description": "Get participants",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Event_Participants.Group_ID IN (550)",
+        "category": "Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true,
+            "value": "71510"
+          }
+        },
+        "metadata": {
+          "category": "Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "christmas-fest-toys-3-5",
+        "name": "🎄 Ages 3-5",
+        "description": "Get attending Christmas Fest participants ages 3-5",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Participant_ID_Table_Contact_ID_Table.Household_ID, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth <= DATEADD(YEAR, -3, GETDATE()) AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth > DATEADD(YEAR, -6, GETDATE())",
+        "distinct": true,
+        "category": "Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true,
+            "value": "71510"
+          }
+        },
+        "metadata": {
+          "category": "Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "christmas-fest-toys-6-8",
+        "name": "🎄 Ages 6-8",
+        "description": "Get attending Christmas Fest participants ages 6-8",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Participant_ID_Table_Contact_ID_Table.Household_ID, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth <= DATEADD(YEAR, -6, GETDATE()) AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth > DATEADD(YEAR, -9, GETDATE())",
+        "distinct": true,
+        "category": "Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true,
+            "value": "71510"
+          }
+        },
+        "metadata": {
+          "category": "Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "christmas-fest-toys-9-13",
+        "name": "🎄 Ages 9-13",
+        "description": "Get attending Christmas Fest participants ages 9-13",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Participant_ID_Table_Contact_ID_Table.Household_ID, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth <= DATEADD(YEAR, -9, GETDATE()) AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth > DATEADD(YEAR, -14, GETDATE())",
+        "distinct": true,
+        "category": "Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true,
+            "value": "71510"
+          }
+        },
+        "metadata": {
+          "category": "Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "christmas-fest-toys-14-17",
+        "name": "🎄 Ages 14-17",
+        "description": "Get attending Christmas Fest participants ages 14-17",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Participant_ID_Table_Contact_ID_Table.Household_ID, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth <= DATEADD(YEAR, -14, GETDATE()) AND Participant_ID_Table_Contact_ID_Table.Date_of_Birth > DATEADD(YEAR, -18, GETDATE())",
+        "distinct": true,
+        "category": "Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true,
+            "value": "71510"
+          }
+        },
+        "metadata": {
+          "category": "Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "manual-event-male",
+        "name": "By Event ID",
+        "description": "Get participants for specific event(s)",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Event_Participants.Group_ID IN (550)",
+        "category": "Search Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true
+          }
+        },
+        "metadata": {
+          "category": "Search Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "event-search-by-name-event",
+        "name": "By Name (Main Event)",
+        "description": "Find all events where title contains 'Main Event' ",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 ",
+        "category": "Search Events",
+        "params": {
+          "eventId": {
+            "type": "text",
+            "label": "Event Name",
+            "required": true,
+            "searchTerm": "Main Event"
+          }
+        },
+        "metadata": {
+          "category": "Search Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "event-search-by-name-custom",
+        "name": "By Name (custom)",
+        "description": "Find events using search term",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Event_Participants.Group_ID IN (550)",
+        "category": "Search Events",
+        "params": {
+          "eventId": {
+            "type": "text",
+            "label": "Event Name",
+            "required": true
+          }
+        },
+        "metadata": {
+          "category": "Search Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "upcoming-events-range",
+        "name": "By Date Range (2 days)",
+        "description": "Get participants from events in the previous and next 2 days",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Event_Participants.Group_ID IN (550)",
+        "category": "Search Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Days",
+            "required": true,
+            "daysPast": 2,
+            "daysFuture": 2
+          }
+        },
+        "metadata": {
+          "category": "Search Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "events-date-range",
+        "name": "By Date Range (custom)",
+        "description": "Get adult participants from events in the previous and next (x) days",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND Participation_Status_ID = 3 AND Event_Participants.Group_ID IN (550)",
+        "category": "Search Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Days",
+            "required": true
+          }
+        },
+        "metadata": {
+          "category": "Search Events",
+          "previewFields": [
+            "idCard",
+            "firstName",
+            "lastName",
+            "timeIn"
+          ]
+        }
+      },
+      {
+        "id": "group-participants",
+        "name": "Group Participants",
+        "description": "Get all participants in a group",
+        "table": "Group_Participants",
+        "select": "Group_Participant_ID, Group_ID, Participant_ID, Group_Role_ID, Start_Date, End_Date",
+        "filter": "Group_ID IN ({{groupId}}) AND (End_Date IS NULL OR End_Date > GETDATE())",
+        "category": "Groups",
+        "params": {
+          "groupId": {
+            "type": "number",
+            "label": "Group ID(s)",
+            "required": true
+          }
+        },
+        "metadata": {
+          "category": "Groups",
+          "previewFields": [
+            "groupParticipantID",
+            "firstName",
+            "lastName",
+            "startDate"
+          ]
+        }
+      },
+      {
+        "id": "mens-checked-in",
+        "name": "Men's Checked In",
+        "description": "Get participants 18+ for specific event(s)",
+        "table": "Event_Participants",
+        "select": "Participant_ID_Table_Contact_ID_Table.ID_Card, Time_In, Participant_ID_Table_Contact_ID_Table.Contact_ID, Participant_ID_Table_Contact_ID_Table.Nickname AS [First_Name], Participant_ID_Table_Contact_ID_Table.Last_Name, Participant_ID_Table_Contact_ID_Table.Date_of_Birth, Participant_ID_Table_Contact_ID_Table.Email_Address, Participant_ID_Table_Contact_ID_Table.Mobile_Phone, Group_Participant_ID_Table_Group_ID_Table.Group_Name ",
+        "filter": "Event_ID IN ({{eventId}}) AND \n(Participation_Status_ID = 3 OR Participation_Status_ID = 4) AND\nParticipant_ID_Table_Contact_ID_Table.Gender_ID = 1 AND\nParticipant_ID_Table_Contact_ID_Table.Date_of_Birth <= DATEADD(YEAR, -18, GETDATE())",
+        "category": "Search Events",
+        "params": {
+          "eventId": {
+            "type": "number",
+            "label": "Event ID(s)",
+            "required": true
+          }
+        },
+        "metadata": {
+          "category": "Search Events",
+          "previewFields": []
+        }
+      }
+    ]
+  }
+}

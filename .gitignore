@@ -23,3 +23,10 @@ backend/**/*.map
 # root-level now; `dist/` above is where adapter-static writes the site Express serves.
 .svelte-kit/
 build/
+
+# Backup payloads: ignored by default, because a populated one carries participants' names,
+# emails, phones and dates of birth, and this repo is on GitHub. Naming one explicitly is a
+# deliberate act — see backups/README.md for the screening rule.
+backups/*
+!backups/README.md
+!backups/2026-09-10-fresh-start-config.json
