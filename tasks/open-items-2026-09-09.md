@@ -1,8 +1,10 @@
 # Open items after the production walkthrough — dispositions
 
-Status: **all closed but one.** Two were diagnosed as non-bugs, three closed in code, the
-restore click was exercised and the fixes are deployed with a complete 1.1 backup taken on
-production. The single outstanding item is a live SMS to a number the operator owns.
+Status: **all closed.** Two were diagnosed as non-bugs, three closed in code, the restore click
+was exercised and the fixes are deployed with a complete 1.1 backup taken on production. The
+last one — a live SMS to a number the operator owns — was sent and received on 2026-09-09; see
+§5, and note that it paid for itself immediately by exposing two configuration defects that no
+amount of mocking would have found.
 
 Everything else that was called "blocked" turned out to be blocked only on an external system,
 never on the app's own logic — and that logic is now under test. Two defects fell out of
@@ -77,12 +79,13 @@ needs hardware or someone else's production system, and the half that does not.
 | Backup / restore | the click on production | `export.test.ts` + `batch.test.ts` — 15 tests |
 | QR scanner | camera and wristband | `scanner.svelte.test.ts` — 7 tests |
 
-- **A real SMS — still outstanding, and only the operator can close it.** Everything up to
-  dispatch is verified: confirmation dialog, template resolution, phone-field precedence,
-  rendered message, `sms: null` afterwards proving nothing was sent. Only a live send to a
-  number the operator owns remains. A public one-time SMS number is not a substitute — those
-  pools are filtered by bulk gateways, so a failure would not distinguish a broken app from a
-  junk number, the inbox is public, and the number may belong to someone real.
+- **A real SMS — CLOSED 2026-09-09, and it found two defects on the way through.** See §5.
+  Everything up to dispatch had been verified: confirmation dialog, template resolution,
+  phone-field precedence, rendered message, `sms: null` afterwards proving nothing was sent.
+  Only the live send to a number the operator owns remained, and it has now happened. A public
+  one-time SMS number was rejected as a substitute — those pools are filtered by bulk gateways,
+  so a failure would not distinguish a broken app from a junk number, the inbox is public, and
+  the number may belong to someone real.
 - **Ministry Platform import — logic covered.** `src/lib/services/mp-sync.test.ts` stubs
   `mpExecuteQuery` and leaves everything below the network real: `mpRecordToRow` (MP returns
   numbers, nulls and dates; every downstream template does string work on them), `fieldNames`
@@ -180,3 +183,33 @@ The fixes then shipped, and a fresh backup was taken on production through the r
 923.5 KB against the old backup's 921.9 KB, which is the measure of how cheap the omission was
 to fix. The old 1.0 payload `LH6MMOA5` was **kept, not deleted** — deleting is irreversible and
 two backups beat one. Remove it from Settings → Backup Online if unwanted.
+
+## 5. The live SMS — CLOSED, and it exposed two defects mocks could not
+
+Sent 2026-09-09 through the real path: a one-entry copy of a production list, drawn on the
+projector, then the envelope in the `/present` header — confirmation dialog, "Send messages", the
+lot. Delivered to the operator's own number and confirmed received by them.
+
+    messageId  308334428003
+    status     queued → delivered      (deliveredAt written back onto the winner)
+    body       "Congratulations Wilhelm Mauch! You won Test. Your code: 126634"
+
+Main Event was never touched: the draw ran against a copy holding a single entry, and the copy,
+the winner and the history record were deleted afterwards. Production data was byte-identical
+across the exercise.
+
+**Two configuration defects surfaced that every mocked test had passed straight over**, which is
+the argument for having done it at all:
+
+- **No template was marked default.** `messageTemplateFor` falls back to `data.defaultTemplate`,
+  which requires `isDefault: true`; the only template had `isDefault: false` and the prize had no
+  `templateId`. Every send in that instance would have failed with "No SMS template for this
+  prize" — a failure that only appears at dispatch, which is exactly the line the tests stop at.
+- **`{contactId}` never resolved.** The template said `Your code: {contactId}` while the MP field
+  is `contactID`. Unresolved placeholders are left standing by design, so the text would have gone
+  out reading `Your code: {contactId}` verbatim.
+
+Both were corrected at the operator's request rather than worked around, so the delivered message
+is the one the template intends. The casing trap is worth remembering: placeholders fall through
+to `winner.data[key]` unchanged, and MP field names are not camel-cased on import — deliberately,
+because renaming them would break the templates of every existing MP list.
