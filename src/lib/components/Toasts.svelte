@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
+  import { registerOverlay } from '$lib/state/layers';
   import { toasts, type ToastVariant } from '$lib/state/toasts.svelte';
 
   const ICONS: Record<ToastVariant, string> = {
@@ -11,6 +12,15 @@
 
   const reduceMotion =
     typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let element: HTMLDivElement;
+
+  /**
+   * `$lib/state/layers.ts` moves this element into an open modal and back out again. It is
+   * handed over by reference rather than found by selector, because by the time it is handed
+   * back the dialog holding it has already been detached — see the note in that module.
+   */
+  $effect(() => registerOverlay(element));
 </script>
 
 <!--
@@ -19,7 +29,7 @@
   `polite` so it never interrupts, and the container is always in the DOM so the region is
   registered before the first message arrives.
 -->
-<div class="app-toasts" role="status" aria-live="polite" aria-atomic="false">
+<div bind:this={element} class="app-toasts" role="status" aria-live="polite" aria-atomic="false">
   {#each toasts.items as toast (toast.id)}
     <div
       class="app-toast app-toast-{toast.variant}"

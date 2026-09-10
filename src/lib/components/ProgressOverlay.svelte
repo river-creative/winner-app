@@ -1,5 +1,11 @@
 <script lang="ts">
+  import { registerOverlay } from '$lib/state/layers';
   import { ui } from '$lib/state/ui.svelte';
+
+  let element: HTMLDivElement;
+
+  /** Handed to `layers.ts` by reference, for the reason documented in that module. */
+  $effect(() => registerOverlay(element));
 </script>
 
 <!--
@@ -12,6 +18,7 @@
   later would be created back in `<body>`, behind the top layer, and never seen.
 -->
 <div
+  bind:this={element}
   class="progress-overlay"
   class:is-visible={ui.progressVisible}
   role="status"
