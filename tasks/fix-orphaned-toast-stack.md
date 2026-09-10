@@ -1,9 +1,10 @@
 # The toast stack is orphaned by any confirm dialog — plan
 
-**Status: root-caused and verified on a live instance. Not implemented — awaiting approval.**
+**Status: FIXED in `791cbea`.** Found while verifying something else (the restore click), and
+kept here as the record of what broke and why the fix takes the shape it does.
 
-This is a defect found while verifying something else (the restore click). It is outside the
-scope that was asked for, which is why it is a plan rather than a commit.
+Four tests in `src/lib/state/layers.svelte.test.ts`; three of them fail against the old code.
+Re-verified on a live instance in both themes after the change.
 
 ## What breaks
 
