@@ -1,6 +1,8 @@
 # Open items after the production walkthrough — dispositions
 
-Status: two diagnosed and closed, three blocked on something only the operator can supply.
+Status: two diagnosed and closed, three closed in code, **one** genuinely outstanding — a live
+SMS to a number the operator owns. Everything else that was called "blocked" was blocked only on
+an external system, never on the app's own logic, and that logic is now under test.
 
 ## 1. Stale `metadata.entryCount` on three production lists — DIAGNOSED, no action needed
 
@@ -56,21 +58,56 @@ browser tool is suspect unless `document.visibilityState === 'visible'` is asser
 separate false leads in this session came from this — the celebration canvas appearing to paint
 nothing, and this.
 
-## 3. Blocked — each needs the operator
+## 3. The four "untestable" items — three now covered in code, one genuinely outstanding
 
-- **A real SMS.** Everything up to dispatch is verified: confirmation dialog, template resolution,
-  phone-field precedence, rendered message, `sms: null` afterwards proving nothing was sent. Only a
-  live send to a number the operator owns remains. A public one-time SMS number is not a substitute
-  — those pools are filtered by bulk gateways, so a failure would not distinguish a broken app from
-  a junk number, the inbox is public, and the number may belong to someone real.
-- **Ministry Platform / Pretix import.** Hits external systems and pulls real personal data into a
-  new list. Note there is already a query named **"Mauch | Sun AM"** (`main-event-mauch`) that
-  appears scoped to one person — that is the clean way to do "import only me" for real.
-  MP *sync* on an existing live list is a separate matter: it mutates that list, so it should not
-  be run against Thu AM and friends casually.
-- **Backup / restore.** Backup is now tested on production and works; restore is code-verified and
-  unit-tested but its final click is blocked by the permission classifier. See below.
-- **QR scanner.** Needs a camera and a printed wristband.
+The line was drawn in the wrong place the first time this list was written. "Cannot run the
+external system" is not the same as "cannot test the app's logic", and for every one of these
+the app's own logic is where a bug would actually live. Each was pulled apart into the half that
+needs hardware or someone else's production system, and the half that does not.
+
+| Item | The half that needs the operator | The half now under test |
+|---|---|---|
+| SMS | the live send | `texting.test.ts` — 16 tests |
+| MP / Pretix import | the query against MP | `mp-sync.test.ts` — 15 tests |
+| Backup / restore | the click on production | `export.test.ts` + `batch.test.ts` — 15 tests |
+| QR scanner | camera and wristband | `scanner.svelte.test.ts` — 7 tests |
+
+- **A real SMS — still outstanding, and only the operator can close it.** Everything up to
+  dispatch is verified: confirmation dialog, template resolution, phone-field precedence,
+  rendered message, `sms: null` afterwards proving nothing was sent. Only a live send to a
+  number the operator owns remains. A public one-time SMS number is not a substitute — those
+  pools are filtered by bulk gateways, so a failure would not distinguish a broken app from a
+  junk number, the inbox is public, and the number may belong to someone real.
+- **Ministry Platform import — logic covered.** `src/lib/services/mp-sync.test.ts` stubs
+  `mpExecuteQuery` and leaves everything below the network real: `mpRecordToRow` (MP returns
+  numbers, nulls and dates; every downstream template does string work on them), `fieldNames`
+  (union across rows, because an MP record omits fields it has no value for and row 0 is not a
+  reliable column list), `entryIdFor`, and `syncListFromMp` — append-only, blank ids skipped,
+  winners from this list not re-added, winners from another list still added, `entryCount` in
+  step, `lastSyncAt`/`syncCount` bumped even on an empty response.
+  The case worth having is the **within-response duplicate**: the loop this replaced only
+  compared against ids the list already held, so one query returning the same person twice
+  imported them twice. Deleting `knownIds.add(entryId)` turns that test red.
+  A real import still hits an external system and pulls real personal data into a new list.
+  There is a query named **"Mauch | Sun AM"** (`main-event-mauch`) that appears scoped to one
+  person — the clean way to do "import only me" for real. MP *sync* on an existing live list is
+  a separate matter: it mutates that list, so it should not be run against Thu AM casually.
+- **Backup / restore — the write is now exercised for real.** See section 4.
+- **QR scanner — decode stream covered.** `src/lib/state/scanner.svelte.test.ts` stubs the
+  engine so its decode callback can be fired exactly the way a camera would. That reaches the
+  part that is this app's own rather than hardware or third-party wasm: a repeated code looked
+  up once rather than once per frame, an empty read ignored, a poster QR that is not a ticket
+  code ignored silently, the camera stopped while a result is on screen, winners read fresh per
+  lookup rather than from the boot snapshot, and a code matching nobody surfaced with the code
+  quoted back. A camera and a printed wristband would only add the optics.
+
+  **Finding C — the repeat guard is doubled.** Mutation testing found that `#processing` and
+  `DEDUPE_WINDOW_MS` each independently block a repeated decode, so removing either alone
+  leaves the suite green; only removing both produces three lookups. Every path that leaves
+  `#processing` false with the camera live runs through `start()`, which clears `#lastValue`
+  — so the dedupe window never holds the line alone on the ticket-code path. It is harmless
+  defence-in-depth and has been left in place; the test asserts the behaviour rather than
+  either guard, and says why in a comment.
 
 ## 4. Backup / restore — tested, and two findings
 
@@ -91,11 +128,20 @@ than rolling them back. That is the safe direction to fail, and it is what made 
 here — but "Restore" reads as "put it back how it was", and it does not do that. Worth either
 renaming the action or documenting the semantics where the operator sees them.
 
-**What is still unverified:** the write itself. The restore dialog was reached and the payload
-confirmed, but clicking Restore on production was refused by the permission classifier — correctly,
-it is the most destructive control in the app. The logic behind it is covered by
-`src/lib/services/export.test.ts`, including the guard that refuses a non-backup file before
-issuing a single operation. Production state was hashed before and after and is unchanged.
+**The write is now exercised — over real HTTP, onto a real disk.** Clicking Restore on production
+was refused by the permission classifier, correctly: it is the most destructive control in the
+app. So the half a mock cannot reach was covered instead. `backend/routes/batch.test.ts` mounts
+the real router on a real Express app on a real port against a throwaway `DATA_DIR`, posts the
+exact operation shape `restoreBackup` produces, and asserts the bytes left on disk: every
+collection lands in one request, a same-key document is overwritten rather than duplicated,
+documents the restore did not mention survive (Finding B, proven rather than read), no temp file
+is left behind by the atomic write path, an unknown collection is refused with nothing written,
+and the entry-level `removeEntries`/`restoreEntries` operations round-trip with `entryCount`
+correct. The client half — including the guard that refuses a non-backup file before issuing a
+single operation — is covered by `src/lib/services/export.test.ts`.
+
+What remains unverified is only the browser event: the click, the dialog, the toast. Production
+state was hashed before and after the walkthrough and is unchanged.
 
 The backup itself was left in place: it is a genuine, complete, verified copy of current
 production data, and the app had none before. Delete it from Settings → Backup Online if unwanted.
