@@ -127,9 +127,19 @@ A component test that mounts the layout's overlays, opens and closes a dialog, a
 visible in the document. It must be shown failing against the current `layers.ts` before it is
 trusted.
 
-## Also noticed, not part of this
+## A flag raised and withdrawn
 
-`SessionExpiredOverlay` is mounted in the same layout but is not in `OVERLAY_SELECTORS`, so it
-is not moved into an open dialog and would be painted behind one. Whether that matters depends
-on whether a session can expire while a modal is up — worth a look, separately, and not bundled
-into this fix.
+An earlier draft of this plan claimed `SessionExpiredOverlay` was missing from
+`OVERLAY_SELECTORS` and would paint behind an open dialog. **That was wrong.** It is not a plain
+overlay div: it is itself a modal `<dialog>` opened with `showModal()`, so it enters the top
+layer on its own and never needed `layers.ts`. Its own header says so, and says it was measured.
+
+Confirmed independently while testing the restore flow: two stacked modals rendered with the
+later one — the confirmation — painted above the restore list. Later `showModal()` wins, which
+is exactly what that component relies on.
+
+The one residual is inconsequential. While the session-expired dialog is up, the toast stack is
+still parented to whichever `Dialog.svelte` was open beneath it, so a toast fired at that moment
+would sit behind it. That dialog is deliberately terminal — no Escape, no close button, sign in
+again — and every read and write is failing by then anyway, so there is nothing a toast could
+usefully add. Not worth changing.
