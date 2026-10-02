@@ -1,4 +1,10 @@
 #!/bin/bash
+# Fail fast: a failed chown used to be ignored, so the permission fix silently never happened (audit 2026-07-19).
+set -euo pipefail
+
+# The data directory sits next to this script, wherever the repo is checked out. It was hardcoded to
+# /srv/dev/winner/data/, a path that matched no deploy root (deploy.sh uses /srv/win/) and no longer exists.
+DATA_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/data"
 
 echo "=== Docker Rebuild Script for Winner App ==="
 echo ""
@@ -17,18 +23,23 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+if [ ! -d "$DATA_DIR" ]; then
+    echo "ERROR: data directory not found: $DATA_DIR" >&2
+    exit 1
+fi
+
 # Stop existing container
 echo "Stopping existing container..."
 docker-compose down
 
 # Fix permissions - Set to UID 1001 (nodejs user in container)
 echo "Fixing data directory permissions..."
-chown -R 1001:1001 /srv/dev/winner/data/
-chmod -R 755 /srv/dev/winner/data/
+chown -R 1001:1001 "$DATA_DIR"
+chmod -R 755 "$DATA_DIR"
 
 # Show current permissions
 echo "Current permissions:"
-ls -la /srv/dev/winner/data/
+ls -la "$DATA_DIR"
 
 # Remove old image
 echo "Removing old Docker image..."
@@ -57,4 +68,4 @@ echo ""
 echo "To check if the app is working:"
 echo "1. Try accessing http://localhost:3001/api/health"
 echo "2. Check logs with: docker-compose logs -f"
-echo "3. Try adding a new list and check if it's saved to /srv/dev/winner/data/lists.json"
+echo "3. Try adding a new list and check if it's saved to $DATA_DIR/lists.json"

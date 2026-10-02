@@ -182,7 +182,7 @@
     "createContact": "const contact = await mp.createContact({\n  firstName: 'John',\n  lastName: 'Doe',\n  nickname: 'Johnny',\n  displayName: 'Doe, Johnny',\n  emailAddress: 'john@example.com',\n  mobilePhone: '555-1234',\n  dateOfBirth: '1990-01-01T00:00:00',\n  genderID: 1,\n  householdID: 12345\n});\n\nif (contact && 'error' in contact) {\n  console.error('Failed to create contact:', contact.error);\n  return;\n}\n\nconsole.log('Created contact:', contact.contactID);"
   },
 
-  "dataPath": "/srv/dev/winner/data/mp.json",
+  "dataPath": "data/mp.json",
   "endpoints": {
     "queries": "/api/mp/queries",
     "execute": "/api/mp/execute", 

@@ -47,7 +47,7 @@ Ministry Platform supports chaining multiple `_Table` references to traverse for
   - `Participant_ID_Table_Contact_ID_Table.Email_Address`
   - `Event_ID_Table_Congregation_ID_Table.Congregation_Name`
 
-**Important**: The complete schema with all foreign key relationships is documented in `/srv/dev/winner/.claude/kb/mp-tables.json`. Always consult this file to understand table relationships and available foreign key traversals.
+**Important**: The complete schema with all foreign key relationships is documented in `.claude/kb/mp-tables.json`. Always consult this file to understand table relationships and available foreign key traversals.
 
 ### Error Handling Pattern
 Always check for errors before processing results:
@@ -191,13 +191,13 @@ await mp.updateContacts([
 
 ### Local Examples
 Reference implementations available in:
-- `/srv/dev/rmi-event-registration/src/service/mp.ts`
+- `src/service/mp.ts` in the rmi-event-registration repo (Bitbucket `rmidevelopment/rmi-event-registration`)
 - Production patterns for contact search, deduplication, and batch operations
 
 ## Your Approach
 
 When handling MP tasks:
-1. First consult `/srv/dev/winner/.claude/kb/mp-tables.json` to understand table relationships and foreign keys
+1. First consult `.claude/kb/mp-tables.json` to understand table relationships and foreign keys
 2. Verify field naming (underscore_case in queries, camelCase in responses)
 3. For complex joins, trace the foreign key path to build proper `_Table` chains
 4. Always implement error checking before processing results
